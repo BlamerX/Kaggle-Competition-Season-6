@@ -22,6 +22,161 @@ The format block stays first; dated entries are written below it.
 ---
 
 
+### 19-09-2026
+- **Goal**: Test a second model family on V20's artifact matrix — the family axis was only probed once before (V19→V20, LightGBM→XGBoost)
+- **Experiments**:
+  - V24: GPU CatBoost `depth=6`, lr=0.03, `l2_leaf_reg=3.0`, `min_data_in_leaf=20`, Bernoulli 0.8, `random_strength=1.0`, `max_bin=1024`, od_wait=500, `use_best_model=True`; features/params/CV otherwise identical to V20
+  - Best iterations 1243-1549 per fold (vs XGBoost's 3375-4984), fold times 126-140 s
+- **Timing**: 13.7 min total — fastest full run yet (V20 20.6 min, V19 33.7 min)
+- **Key Learning**:
+  - OOF 0.94593 and LB 0.94615: rejected, -0.00013 OOF / -0.00024 LB vs V20; CatBoost stayed behind XGBoost and LightGBM on identical features, so the family ordering is settled and the axis is closed
+  - The feature story replicated: `TE_lift_trigram_cat_10` (8.20%) and `TE_lift_trigram_cat_auto` (8.18%) took the top two slots, plus `TE_lift_Subsidy_Available_cat_auto` at #7 — the lift trigram is the dominant signal in every family, not an XGBoost-specific artefact
+  - Cheap to run (~1.5k iterations), so it is useful as a fast diagnostic harness, not as a scorer
+- **Status**: ❌ Failed
+
+### 19-09-2026
+- **Goal**: Buy score on the inference side instead of the feature side — give the test predictions a model that saw 100% of the labels
+- **Experiments**:
+  - V23: V20's CV loop unchanged (same 378 features, same depth=4 lossguide recipe, same KFold rs=42), then `[3b]` refits one model on train + original (678,665 rows x 312 cols) at `n_estimators` = mean best iteration (4112), no early stopping
+  - `test_probs = 0.50 x fold-average + 0.50 x refit`; OOF left purely out-of-fold so the CV stays honest and comparable
+  - Instrumented the blend: Pearson / Spearman / mean |rank difference| between refit and fold average on the 286,571 test rows
+- **Timing**: 23.4 min total (CV 17.0 min + refit 2.2 min + loading/FE); folds 200 s, 219 s, 190 s, 189 s, 223 s
+- **Key Learning**:
+  - LB 0.94641 (new best, +0.00002 over V20/V19's 0.94639) with OOF 0.94606 unchanged by construction — the first gain we have taken from inference rather than features, and it cost 2.2 minutes of compute
+  - The refit barely moved the ranking: Pearson 0.99959, Spearman 0.99946, mean |rank diff| 1,806 of 286,571 rows. So the +25% labels is worth a little, and the small disagreement that survives is exactly where the remaining inference-side variance sits (blend weight, iteration count, repeated-split averaging)
+  - Fold importances matched V20 within rounding (`TE_lift_trigram_cat_auto` 0.14488), confirming the deterministic CV path was not perturbed
+- **Status**: 🏆 Best
+
+### 19-09-2026
+- **Goal**: Tune the estimator on our own matrix — V20 inherited najiama's parameters, which were tuned on his feature set, not ours
+- **Experiments**:
+  - V22: two-stage search, 6 configs sharing one fold-matrix build; Stage A on the canonical KFold(rs=42), top-3 re-run on KFold(rs=7), winner by two-split mean
+  - c0 = V20 params (control), c1 = depth 3 / 8 leaves / gamma 1.0 / colsample 0.85, c2 = deeper + heavy leaf reg, c3 = sparse cols + high gamma, c4 = low min_child_weight, c5 = tiny lr near-depthless lossguide
+  - Stage A OOF: c1 0.94608, c0 0.94606, c4 0.94605, c2 0.94593, c3 0.94576, c5 0.94546; rs=7: c1 0.94608, c0 0.94607, c4 0.94605
+  - Submission = winner's test predictions averaged over both splits; OOF = rs=42 winner
+- **Timing**: 116.8 min total (Stage A 75.9 min, Stage B 37.9 min)
+- **Key Learning**:
+  - LB 0.94640 and OOF 0.94608 — new best single-model OOF, +0.00002 over the in-run control on both splits; the control reproduced V20's 0.94606 exactly, which validates the harness
+  - Direction is the useful part: deeper trees and heavier leaf regularisation lose (-0.00013), tiny learning rate loses badly (-0.00060), while depth 3 with 3x the columns and ~5.5k trees wins narrowly — this matrix wants wide, weak, many learners
+  - c1 re-concentrated gain onto the artifact crosses (lift-trigram auto+10 = 0.419 of fold-1 gain vs 0.253 for c0) and pushed raw `Environmental_Concern_Level` to #3: the inverse of V21's collapse, confirming a shallow model needs both a wide pool and the pre-computed crosses
+- **Status**: ✅ Good
+
+### 19-09-2026
+- **Goal**: Reallocate V20's feature budget from dead weight into explicit conditional crosses (Simpson-reversal keys from the discussion threads)
+- **Experiments**:
+  - V21: V20 model unchanged; added 6 cross keys (charging-total x Home_Charging, City x Home_Charging, ECL x Home_Charging, ECL x City, income-band x ECL x Subsidy, ECL x Subsidy x commute with 5.0 km isolated), each Triple-TE'd plus its own target-free lift column; removed the digit block and 4 income-anomaly flags
+  - Fixed bin edges in CFG so train/test/orig bin identically; 159 base + 189 TE = 348 features (V20 had 378)
+  - Paired DeLong against V20/V19/V10/V14 to judge the change
+- **Timing**: 16.4 min total (186 s, 181 s, 169 s, 176 s, 183 s) — fastest full run yet
+- **Key Learning**:
+  - OOF 0.94597 and LB 0.94629: REJECTED, delta -0.00009 vs V20 at z = -5.01 (significant regression, and LB agreed)
+  - The addition was right and the subtraction was wrong: `cx_inc_x_ecl_x_sub` plus its lift took five of the top eight gain slots, so the crosses do carry signal
+  - Removing the digits and flags collapsed the gain distribution — `_ECL_x_Subsidy` grabbed 0.5899 of total gain (5.4x its V20 share) and the lift-trigram family fell from ~35% combined to ~6.7%; only 27 columns were dropped as redundant versus 149 in V20
+  - Process lesson: bundling an addition with a removal destroyed attribution. One change per version, and a shallow lossguide model needs a wide candidate pool so no single feature monopolises splits
+- **Status**: ❌ Failed
+
+### 19-09-2026
+- **Goal**: Isolate the model family by running V19's exact feature matrix through the reference XGBoost depth=4 lossguide recipe
+- **Experiments**:
+  - V20: GPU XGBoost depth=4, lossguide, max_leaves=16, gamma=3.673, min_child_weight=4.532, subsample=0.740, colsample=0.570, alpha=0.752, lambda=0.619, lr=0.01, ES=500; converged 3375-4984 trees
+  - Features reused byte-for-byte from V19: 180 base + 198 Triple TE = 378; same KFold(5, shuffle=True, rs=42) split and original-data concat
+  - Offline paired DeLong of every new OOF against V19/V14/V10/V3 to separate real gains from CV noise
+  - Research pass: read the Simpson's-paradox thread (Charging x HomeCharging and City x HomeCharging reversals), the original-dataset logistic thread (4-feature LR beats XGB/LGB/TabPFN on the 10k source; refit gives inc 2.292 / ecl 1.078 / sub 3.385 / ra_med -1.669 / ra_high -2.960, AUC 0.93766 on comp), the replication-aware Newton boosting thread, and the digit/TE ablation thread
+  - Screened 7 target-free propensity features and Simpson crosses against V19's OOF: no linearly-accessible residual signal (but that screen cannot rule out tree-partition value)
+- **Timing**: 20.6 min total (203 s, 218 s, 207 s, 203 s, 233 s) — 40% faster than V19's 33.7 min
+- **Key Learning**:
+  - OOF 0.94606 vs V19 0.94599: Δ +0.00007 at z = +4.76 — our first statistically significant single-model gain; LB stayed at exactly 0.94639
+  - Public LB (20% of test) cannot resolve +0.00007, so OOF significance and LB movement are now decoupled; V14's OOF remains statistically tied (z = -0.83)
+  - `TE_lift_trigram_cat_auto` is the #1 feature by gain under depth-4 XGBoost (0.1449) vs #4 under LightGBM — shallow models need the pre-computed artifact crosses more
+  - Structural flags and digit features earned almost no gain in XGBoost, independently matching the reference notebook's decision to prune them
+  - Rank 1 is 0.94675 and Deotte is 0.94672 on only 3 submissions, so roughly +0.0003 of real generalizing signal is still available above us
+- **Status**: ✅ Good
+
+### 19-09-2026
+- **Goal**: Convert the verified generator-artifact findings into a new single model (V19) on the proven V10 LightGBM pipeline
+- **Experiments**:
+  - V19: CPU LightGBM 5-fold CV, original-data concatenation, Triple TE, V10 params unchanged
+  - UPGRADE 1: Fixed the digit-extraction bug (`np.rint(col*1e4)` integer divmods) present in all 18 prior versions
+  - UPGRADE 2: 12 target-free generator-lift features (pool ÷ original frequency) on exact income, 100-dollar band, integer commute, 6 categoricals, ECL×Subsidy×Anxiety trigram, plus `novel_inc`
+  - UPGRADE 3: Structural flags `_below_buy_bound` (41,667) and `_dead_zone_exact` (31,004-41,970)
+  - A paired DeLong gate against the saved V10 OOF was written, then removed before running to keep V19 a self-contained single model
+  - 180 base + 198 Triple TE = 378 features after dropping 149 redundant/constant columns
+- **Timing**: 33.7 min total; fold times were 328 s, 408 s, 348 s, 356 s, and 368 s
+- **Key Learning**:
+  - OOF AUC 0.94599 and LB Score 0.94639 — a new best, +0.00003 over V10 and the first real gain since V10
+  - `TE_lift_trigram_cat_auto` ranked #4 in fold-1 importance (531), so the frequency-shaping artifact carries signal the model could not reach before
+  - Fold std stayed at 0.00069 and the OOF gain was +0.00002, so the improvement is genuine but at the edge of the CV noise floor; the LB gain is the stronger evidence
+- **Status**: 🏆 Best
+
+### 19-09-2026
+- **Goal**: Test forward-stepwise hill climbing over all 17 saved OOF predictions, then verify discussion findings and audit scripts for errors
+- **Experiments**:
+  - V18: CPU hill climber (weight step 0.05) over V1–V17 OOFs, compared against simple/rank/logit averages and RidgeCV meta-learner
+  - Selected ensemble: V14=0.35, V3=0.28, V11=0.15, V6=0.13, V2=0.05, V8=0.05; hill OOF 0.94623 (optimistic — weights fit OOF directly), other methods ≤0.94601
+  - Dataset verification: confirmed all discussion claims (30k spike, dead zone, ECL/commute rules, tenths corruption 89.63%, recipe AUC 0.9377)
+  - New artifact findings: income lift buckets non-monotone (under-produced buy 23.19% vs over-produced ~17%), novel-income rows buy 19.56%, ECL=3 cells out-perform recipe formula by ~22–31%, `min income 41,667` structural zero bound, adversarial validation AUC 0.501 (no train/test shift)
+  - Script audit: digit-extraction bug (`// (10**k)` with negative k) present in all 17 versions; TE verified leak-free; OOF integrity confirmed
+- **Timing**: ~10 min for subsampled hill-climb recomputation; full-data grid search infeasible in reasonable time
+- **Key Learning**:
+  - LB finished at 0.94635, 0.00001 below V10's 0.94636 — ensembling inside a 0.996+ correlated pool is exhausted
+  - The +0.00015 OOF hill-climb gain was weight-fitting noise, confirming the honest-combiner ceiling from the discussions
+  - Next lever is generator-artifact features (lift/novelty/structural flags) plus fixing the digit bug, not new combiners
+- **Status**: ⚠️ Partial
+
+### 11-09-2026
+- **Goal**: Test RealMLP with the V14 full feature pipeline, original-data concatenation, Triple TE, and short three-epoch training
+- **Experiments**:
+  - V17: GPU RealMLP 5-fold CV with PBLD embeddings and an 8-model ensemble
+  - Architecture: three hidden layers of 256 units, EMA, label smoothing, and 3 epochs
+  - Used 159 engineered features expanded to 293 model inputs: 124 categorical and 169 numerical
+- **Timing**: 97.3 min total; fold times were 1052 s, 1105 s, 1123 s, 1195 s, and 1240 s
+- **Key Learning**:
+  - OOF AUC reached 0.94582 and LB Score reached 0.94612, tying V9
+  - RealMLP remained below V14’s 0.94630 LB despite using the full feature pipeline and original-data concatenation
+  - The model was substantially slower than the strongest tree-based baselines
+- **Status**: ✅ Good
+
+### 11-09-2026
+- **Goal**: Test five forensic-targeted features on the V14 depth-3 XGBoost baseline without pseudo-labels
+- **Experiments**:
+  - V16: GPU XGBoost depth 3, 5-fold CV, based on V14’s proven feature pipeline
+  - Added subsidy × home-charging bigram, recipe × subsidy/income interaction, and ECL-specific buyer-centroid distances
+  - Distance features were computed per fold to avoid leakage
+  - Retained 164 final features, with 2 of 2 forensic features surviving selection and 5 forensic signals reported in importance
+- **Timing**: 28.6 min total; fold times were 283 s, 355 s, 333 s, 282 s, and 334 s
+- **Key Learning**:
+  - OOF AUC reached 0.94595 and LB Score reached 0.94625, below V14’s 0.94630 LB
+  - The forensic features contributed small fold-1 importance, led by `TE_bigram_Sub_HomeCharging`
+  - No pseudo-labels were used, isolating the impact of the forensic feature additions
+- **Status**: ✅ Good
+
+### 10-09-2026
+- **Goal**: Test exact-match lookup plus CPU KDTree KNN as a non-tree baseline
+- **Experiments**:
+  - V15: 5-fold CPU KNN with k=10 fallback and exact-match lookup
+  - Encoded 24 features for KDTree distance search
+  - Checked train/test key overlap and train-key uniqueness before modeling
+- **Timing**: 19.5 min total; fold times were 164 s, 172 s, 166 s, 164 s, and 146 s
+- **Key Learning**:
+  - OOF AUC was 0.91359 and LB Score was 0.91256, with a negative -0.00103 LB–OOF gap
+  - Exact matches were 0% for validation and test; every train key was unique, confirming no deterministic lookup shortcut
+  - KNN was substantially weaker than the feature-engineered tree and neural baselines
+- **Status**: ❌ Failed
+
+### 09-09-2026
+- **Goal**: Test high-confidence pseudo-labeling using V10 teacher predictions with the proven V12 depth-3 XGBoost student
+- **Experiments**:
+  - V14: GPU XGBoost depth 3 with 5-fold CV, original-data concatenation, and pseudo-labeled test rows
+  - Teacher: V10 predictions; pseudo-label thresholds `p>=0.98` and `p<=0.02`
+  - Added 150,859 pseudo-labeled rows: 999 buyers and 149,860 non-buyers, each at half weight
+  - Used V10/V12 proven features with 159 final columns and 97 TE columns
+- **Timing**: 35.4 min total; fold times were 404 s, 405 s, 365 s, 345 s, and 464 s
+- **Key Learning**:
+  - OOF AUC reached 0.94608 and LB Score reached 0.94630, ranking third overall
+  - Pseudo-labeling improved V12’s LB from 0.94629 to 0.94630, but the gain was only 0.00001
+  - `_ECL_x_Subsidy`, `TE_trigram_Sub_ECL_RA`, and `_ev_recipe` dominated fold-1 importance
+- **Status**: ✅ Good
+
 ### 09-09-2026
 - **Goal**: Test DCN-V2 deep cross networks with the compact evidence-based feature set used by V6
 - **Experiments**:

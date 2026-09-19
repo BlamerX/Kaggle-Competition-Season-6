@@ -17,6 +17,249 @@ The format block stays first; feature entries are written below it.
 
 ---
 
+## Version 24 — Confirmed LB 0.94615 (2026-09-19) ❌ Rejected
+
+No new features. V20's exact matrix (180 base + 198 Triple TE) through CatBoost depth=6 to test whether the feature set family-depends. Importance is CatBoost's fold-1 percentage (predictions/gain based, sums to 100 across the full table), so values are not comparable to XGBoost gain shares above.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `TE_lift_trigram_cat_10` | Smoothing-10 TE of the ECL × Subsidy × Anxiety pool/orig lift | 8.20 | #1 under CatBoost too — the lift trigram leads in a third family | ✅ Used |
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the same lift | 8.18 | #2, near-tied with the 10-view; together they carry 16.4% | ✅ Used |
+| `_ECL_x_Subsidy_cat_fe` | Frequency encoding of the ECL × Subsidy category key | 6.79 | CatBoost's native categorical path for the classic interaction | ✅ Used |
+| `TE_lift_trigram_cat_100` | Smoothing-100 TE of the trigram lift | 3.64 | Third lift-trigram view; family total ≈ 20% | ✅ Used |
+| `_ECL_x_Subsidy` | `Environmental_Concern_Level * Subsidy_Available` | 3.18 | Raw interaction, much weaker here than under XGBoost | ✅ Used |
+| `_ECL_x_RangeAnxiety` | `ECL * (3 - RA_code)` | 1.41 | Behavioral interaction | ✅ Used |
+| `TE_lift_Subsidy_Available_cat_auto` | Auto-smoothed TE of the subsidy lift | 1.27 | Only single-column lift in the top 8 — the crosses dominate | ✅ Used |
+| `TE_bigram_ECL_bin_x_Subsidy_10` | Smoothing-10 TE of ECL bin × subsidy | 1.12 | V10 bigram retained but small | ✅ Used |
+| `TE_lift_income100_cat_*` | Triple TE of the income-band lift | 0.46/0.26 | Income lift again absorbed by the income TEs | ⚠️ No Improvement |
+| whole model | CatBoost depth=6 vs XGBoost depth=4 on identical features | — | OOF 0.94593 vs 0.94606 (-0.00013) / LB 0.94615: right features, worse estimator | ❌ Removed |
+
+## Version 23 — Confirmed LB 0.94641 (2026-09-19) 🏆 Best
+
+No feature changes at all: the CV path is V20's verbatim, so the fold-1 gain table below is V20's within rounding. The change is on the inference side, which this file records because it is now our only working LB lever.
+
+| Item | Definition | Value | Impact | Status |
+|------|------------|-------|--------|--------|
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the trigram lift (fold 1) | 0.14488 gain | Byte-identical to V20's 0.14488 — proof the CV path was untouched | ✅ Used |
+| Full-data refit | 4112 trees (= mean best iteration) on 678,665 rows of train + original | +0.00002 LB | Test blend 0.50 fold-average + 0.50 refit; OOF unaffected, so still honest | ✅ Used |
+| Refit-vs-fold-average correlation | Pearson 0.99959 / Spearman 0.99946 | mean \|rank diff\| 1,806 / 286,571 | The two predictors agree to 4th decimal; only ~0.6% of rows change rank materially | ⚠️ Research |
+| Refit iteration count | `n_estimators` from the mean best iteration, no early stopping | — | Untested alternatives: per-fold mean-of-ranks blend, higher/lower tree count, blend weight ≠ 0.5 | 🔬 Research |
+
+## Version 22 — Confirmed LB 0.94640 (2026-09-19)
+
+No new features (180 base + 198 Triple TE, identical to V19/V20). The estimator was searched, so this entry records what the tuning winner did to the gain distribution. Importance is XGBoost fold-1 gain share; c0's column is the rs=42 table, c1's is the rs=7 fold-1 table (the harness prints only the first config of each fold).
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the trigram lift | 0.2274 (c1) vs 0.1441 (c0) | Doubles its share when depth drops to 3 and colsample rises to 0.85 | ✅ Used |
+| `TE_lift_trigram_cat_10` | Smoothing-10 TE of the trigram lift | 0.1918 (c1) vs 0.1080 (c0) | Together with `_auto` it takes 0.419 of fold-1 gain vs 0.253 for V20's params | ✅ Used |
+| `Environmental_Concern_Level` | Raw ECL column | 0.1039 (c1) | Enters at #3 only in the wide-column config — more columns per split lets raw signals through | ✅ Used |
+| `_ev_recipe` | `ECL == 5 & Range_Anxiety == Low` | 0.0458 (c1) vs 0.0654 (c0) | Stable composite | ✅ Used |
+| `TE_bigram_ECL_bin_x_RangeAnxiety_100` | Smoothing-100 TE of the V10 bigram | 0.0444 (c1) | Promoted by the shallower tree | ✅ Used |
+| `_ECL_x_Subsidy` | `ECL * Subsidy_Available` | 0.1084 (c0), absent from c1's top 10 | Loses share to the lift crosses under c1 | ⚠️ No Improvement |
+| Estimator settings | c1 = `max_depth=3, max_leaves=8, gamma=1.0, colsample_bytree=0.85`, ~5.5k trees | +0.00002 OOF over the in-run c0 control on both rs=42 and rs=7 | Confirms direction: wide + weak + many beats deep + heavily regularised on this matrix | ✅ Used |
+
+> Caveat: V22's c0 fold-1 gain shares (e.g. `TE_lift_trigram_cat_auto` 0.14410) sit slightly below V20/V23's 0.14488 even though c0 reproduced V20's fold AUCs and best iterations exactly. V22 computed importances from the untruncated booster (it ran to `n_estimators=8000`), V20/V23 slice at `best_iteration`. Metrics are unaffected; treat cross-version gain shares as ±0.001.
+
+### V22 search outcomes (feature set fixed, estimator varied)
+
+| Config | Override | rs=42 OOF | Verdict |
+|--------|----------|-----------|---------|
+| c1 shallow + wide cols | depth 3, 8 leaves, gamma 1.0, colsample 0.85 | 0.94608 | ✅ Winner (also 0.94608 on rs=7) |
+| c0 V20 baseline | none (control) | 0.94606 | ✅ Reproduced V20 exactly |
+| c4 low min_child_weight | `min_child_weight` reduced | 0.94605 | ⚠️ No Improvement |
+| c2 deeper + heavy leaf reg | deeper + stronger leaf regularisation | 0.94593 | ❌ Worse |
+| c3 sparse cols + high gamma | colsample ↓, gamma ↑ | 0.94576 | ❌ Worse |
+| c5 tiny lr, near-depthless | lr 0.008, `min_child_weight` 500, lambda 10 | 0.94546 | ❌ Clearly worse |
+
+## Version 21 — Confirmed LB 0.94629 (2026-09-19) ❌ Rejected
+
+Importance is fold-1 XGBoost gain share. V21 added six explicit cross keys (each Triple-TE'd plus a target-free lift column) and removed the digit block and four income-anomaly flags. The experiment regressed (paired DeLong vs V20: -0.00009, z = -5.01), so V20 remains the reference feature set.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `_ECL_x_Subsidy` | `Environmental_Concern_Level * Subsidy_Available` | 58.99 gain | Pathological monopoly — 5.4x its V20 share after the feature pool narrowed; starving every TE branch | ⚠️ No Improvement |
+| `TE_lift_cx_inc_x_ecl_x_sub_cat_10` | Smoothing-10 TE of the income-band x ECL x Subsidy lift | 5.12 gain | Strongest NEW cross; #2 overall — the addition itself worked | ✅ Used |
+| `TE_lift_cx_inc_x_ecl_x_sub_cat_auto` | Auto-smoothed TE of the same lift | 4.60 gain | Companion view of the new deepest key | ✅ Used |
+| `TE_cx_inc_x_ecl_x_sub_auto` | Auto-smoothed TE of the raw cross key | 4.39 gain | Key without the lift transform | ✅ Used |
+| `TE_cx_inc_x_ecl_x_sub_10` | Smoothing-10 TE of the raw cross key | 3.34 gain | Lower-smoothing view | ✅ Used |
+| `TE_lift_cx_inc_x_ecl_x_sub_cat_100` | Smoothing-100 TE of the cross lift | 3.17 gain | Stable broad encoding | ✅ Used |
+| `TE_lift_trigram_cat_100` | Smoothing-100 TE of the ECL x Subsidy x Anxiety lift | 3.10 gain | Was #1 in V20 at 14.49; displaced by the near-duplicate deeper key | ⚠️ No Improvement |
+| `TE_cx_inc_x_ecl_x_sub_100` | Smoothing-100 TE of the raw cross key | 2.14 gain | Third view of the same key | ✅ Used |
+| `TE_lift_trigram_cat_10` / `_auto` | Lift-trigram TE variants | 2.13 / 1.21 gain | Combined lift-trigram share fell from ~35% (V20) to ~6.7% | ⚠️ No Improvement |
+| `lift_Range_Anxiety_Level` | Pool/orig lift of the anxiety level | 0.87 gain | Rose in rank but small absolute gain | ✅ Used |
+
+### V21 cross keys and removals
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `cx_chg_x_home` + `lift_cx_chg_x_home` | charging-total bins x Home_Charging_Possible (Simpson reversal 9.20% -> 14.70%) | not in top-15 | Built correctly, contributed almost nothing once the gain collapsed onto `_ECL_x_Subsidy` | ⚠️ No Improvement |
+| `cx_city_x_home` + lift | City_Type x Home_Charging_Possible (Rural 4.64% vs Urban 13.56%) | not in top-15 | Same as above | ⚠️ No Improvement |
+| `cx_ecl_x_home` / `cx_ecl_x_city` + lifts | ECL x Home_Charging, ECL x City_Type | not in top-15 | Composition confounders, absorbed by the raw columns | ⚠️ No Improvement |
+| `cx_ecl_x_sub_x_comm` + lift | ECL x Subsidy x commute bins (5.0 km isolated) | not in top-15 | The 5.0 km bin did not register | ⚠️ No Improvement |
+| digit block (56 cols in V20) | place-value digits and their `_cat` / `_fe` / TE variants | removed | Removing them did not cause the loss directly but narrowed the pool from 312 to 285 fit columns | ❌ Removed |
+| `is_30k_spike` / `is_millionaire_cliff` / `is_dead_zone` / `_below_buy_bound` / `_dead_zone_exact` | income anomaly + structural recipe flags | removed with digits | Same removal batch; `is_env_hater` was kept | ❌ Removed |
+
+## Version 20 — Confirmed LB 0.94639 (2026-09-19)
+
+No new features were engineered in V20; the V19 matrix was reused unchanged and only the model family was swapped to XGBoost depth=4. Importance is the reported fold-1 XGBoost **gain share** (not a split count, so it is not comparable to V19's counts).
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the ECL × Subsidy × Anxiety pool/orig lift | 14.49 gain | #1 feature overall (was #4 under LightGBM) — a depth-4 model depends heavily on the pre-computed artifact cross | ✅ Used |
+| `_ECL_x_Subsidy` | `Environmental_Concern_Level * Subsidy_Available` | 10.87 gain | Strongest raw interaction, unchanged | ✅ Used |
+| `TE_lift_trigram_cat_10` | Smoothing-10 TE of the trigram lift | 10.84 gain | Second lift-trigram view | ✅ Used |
+| `TE_lift_trigram_cat_100` | Smoothing-100 TE of the trigram lift | 9.31 gain | Stable broad lift encoding | ✅ Used |
+| `TE_bigram_ECL_bin_x_Subsidy_10` | Smoothing-10 TE of ECL bin × subsidy | 9.12 gain | V10 bigram still carries signal | ✅ Used |
+| `_ev_recipe` | `ECL == 5 & Range_Anxiety == Low` | 6.60 gain | Composite recipe segment | ✅ Used |
+| `TE_bigram_ECL_bin_x_Subsidy_auto` | Auto-smoothed TE of ECL bin × subsidy | 4.95 gain | Companion bigram view | ✅ Used |
+| `_ECL_x_RangeAnxiety` | `Environmental_Concern_Level * (3 - RA_code)` | 4.47 gain | Behavioral interaction | ✅ Used |
+| `lift_trigram` | Raw pool/orig lift of the trigram key | 2.14 gain | Direct artifact ratio | ✅ Used |
+| `TE__ECL_x_Subsidy_cat_10` | Smoothing-10 TE of ECL × subsidy categories | 2.05 gain | Categorical interaction view | ✅ Used |
+
+### V20 usage of the V19 artifact set
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `lift_trigram_cat_fe` | Frequency encoding of the trigram lift | 0.19 gain | Marginal next to the TE views | ✅ Used |
+| `TE_lift_commute_cat_*` | Triple TE of integer-commute lift | 0.12/0.10 gain | Weak under XGBoost (stronger under LightGBM) | ⚠️ No Improvement |
+| `lift_income100_cat_fe` / `lift_inc_exact_cat_fe` | Frequency encoding of the income-band / exact-income lift | 0.10/0.08 gain | Income lift largely absorbed by income TE keys | ⚠️ No Improvement |
+| `novel_inc_cat_fe` | Frequency encoding of the novel-income flag | 0.08 gain | Almost unused by the shallow model | ⚠️ No Improvement |
+| `_below_buy_bound` / `_dead_zone_exact` | Structural recipe bounds (income < 41,667 / 31,004–41,970) | ~0 gain | Not selected; matches the reference notebook pruning its equivalent flags | ⚠️ No Improvement |
+| `{col}_digit{k}` and digit TE variants | Fixed integer-place digits | ≤ 0.08 gain | Near-zero contribution under depth=4 | ⚠️ No Improvement |
+
+## Version 19 — Confirmed LB 0.94639 (2026-09-19) 🏆 Best
+
+Importance is the reported fold-1 LightGBM importance. No isolated ablation was run, so impact records observed model contribution in the submitted V19 model. Lift features are target-free: pool (train+test) frequency ÷ original-dataset frequency.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `TE_income100_floor_auto` | Auto-smoothed target encoding of the 100-dollar income floor key | 735 (count) | Strongest fold-1 signal, unchanged from V10 | ✅ Used |
+| `TE_income100_floor_10` | Smoothing-10 TE of the 100-dollar income floor key | 632 (count) | Complementary lower-smoothing income signal | ✅ Used |
+| `TE_Annual_Income_USD_cat_auto` | Auto-smoothed TE of income-as-string categories | 601 (count) | Strong exact-income categorical signal | ✅ Used |
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the pool/orig frequency lift of ECL × Subsidy × Anxiety | 531 (count) | Strongest NEW artifact feature; encodes the ECL=3 cells that beat the linear recipe by 1.22–1.31× | ✅ Used |
+| `TE_Annual_Income_USD_cat_10` | Smoothing-10 TE of income-as-string categories | 458 (count) | Added lower-smoothing income signal | ✅ Used |
+| `TE_Age_cat_auto` | Auto-smoothed TE of age-as-string categories | 408 (count) | Added age-specific structure | ✅ Used |
+| `TE__log_Income_cat_auto` | Auto-smoothed TE of log-income categories | 406 (count) | Nonlinear income-shape signal | ✅ Used |
+| `TE_lift_trigram_cat_10` | Smoothing-10 TE of the trigram lift | 335 (count) | Second trigram-lift view | ✅ Used |
+| `TE__Income_x_Subsidy_cat_auto` | Auto-smoothed TE of income × subsidy categories | 333 (count) | Strong affordability interaction | ✅ Used |
+| `TE_lift_income100_cat_auto` | Auto-smoothed TE of the 100-dollar income-band lift | 330 (count) | Income over/under-production signal | ✅ Used |
+| `grp_income_bin_Annual_Income_USD_dev` | Income deviation from income-bin group mean | 323 (count) | Preserved V10 groupby signal | ✅ Used |
+| `TE_income_exact_int_auto` | Auto-smoothed TE of exact integer income | 318 (count) | Captured repeated exact-income structure | ✅ Used |
+| `lift_inc_exact_cat_fe` | Frequency encoding of the exact-income lift bucket | 313 (count) | Direct target-free artifact prevalence signal | ✅ Used |
+
+### V19 generator-artifact features
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `lift_inc_exact` | pool freq(exact income) ÷ orig freq(exact income) | 230 (count) | Raw lift column; buy rate 23.19% under-produced vs 17.12% heavily over-produced | ✅ Used |
+| `TE_lift_commute_cat_auto/10/100` | Triple TE of integer-commute lift | 230/188/240 (count) | Added commute over-production signal | ✅ Used |
+| `TE_lift_income100_cat_100` | Smoothing-100 TE of income-band lift | 220 (count) | Stable broad income-lift encoding | ✅ Used |
+| `lift_income100_cat_fe` | Frequency encoding of income-band lift | 211 (count) | Secondary artifact prevalence signal | ✅ Used |
+| `TE_Annual_Income_USD_digit3_cat_auto` | TE of the fixed thousands-digit feature (was corrupted pre-V19) | 198 (count) | Recovered by the digit fix | ✅ Used |
+| `TE_Annual_Income_USD_digit2_cat_auto` | TE of the fixed hundreds-digit feature | 178 (count) | Recovered by the digit fix; hundreds digit ≈ round-income marker | ✅ Used |
+| `novel_inc` | Income value absent from the original 10k dataset | — | 2.06% of rows at 19.56% buy vs 17.46% base; low split count | ✅ Used |
+| `_below_buy_bound` | `Annual_Income_USD < 41667` (recipe can never reach 5.5) | — | Structural near-zero region | ✅ Used |
+| `_dead_zone_exact` | `31004 <= Annual_Income_USD <= 41970` | — | 1,257 train rows, 0 buyers | ✅ Used |
+| `lift_Subsidy_Available` / `lift_Range_Anxiety_Level` / `lift_Home_Charging_Possible` / `lift_Gender` / `lift_City_Type` / `lift_Current_Car_Type` / `lift_Environmental_Concern_Level` | Per-value pool ÷ orig frequency ratio per categorical | Not in top-15 | Low-cardinality lifts were near-collinear with the raw categorical and its TE; some variants were removed by redundancy selection (149 features dropped) | ⚠️ No Improvement |
+
+### V19 digit-extraction fix (all 18 prior versions were affected)
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `{col}_digit{k}` | Old: `col // (10**k) % 10` — negative k uses float floor-div and reads IEEE-754 binary representation | 198 (digit3), 178 (digit2) fold-1 | Corrupted 89.63% of `Daily_Commute_km` tenths; `digit-1` was effectively an is-integer flag | ❌ Removed |
+| `{col}_digit{k}` (fixed) | `np.rint(col*1e4).astype(int64)` then integer `// 10**(k+4) % 10` | as above | Correct tenths digit spans buy rate 0.160 → 0.184 | ✅ Used |
+
+## Version 18 — Confirmed LB 0.94635 (2026-09-19)
+
+No new features were engineered; V18 combined saved OOF predictions only. This entry records the ensemble representation and its diagnostics.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| Hill-climber blend | `0.35·V14 + 0.28·V3 + 0.15·V11 + 0.13·V6 + 0.05·V2 + 0.05·V8` on raw probabilities | N/A | LB 0.94635, -0.00001 vs V10; weights fit OOF directly so the +0.00015 OOF gain was noise | ⚠️ No Improvement |
+| Simple/rank/logit averages | Equal-weight mean of probabilities, ranks, and logit-space means | N/A | OOF ≤0.94601, all below best single +0.94608 | ⚠️ No Improvement |
+| RidgeCV meta-learner | Ridge on OOF logit features, alpha chosen by 5-fold CV | N/A | OOF 0.94314; stacker broken by single-fold OOF vs averaged-test aggregation mismatch | ❌ Removed |
+
+## Version 15 — Confirmed LB 0.91256 (2026-09-10)
+
+No fold-level feature importances were reported. This entry records the encoded lookup/KNN representation and exact-match diagnostics.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| Exact-match key | Encoded combination of the 24 KNN input features used for lookup | N/A | Produced 0% validation/test exact matches; no lookup signal was available | ⚠️ No Improvement |
+| KDTree numerical representation | 24 encoded train/test/original features used for Euclidean neighbor search | N/A | Enabled k=10 fallback predictions but produced weak AUC | ✅ Used |
+| KNN k=10 fallback | Mean target of the 10 nearest training neighbors | N/A | Main prediction mechanism; underperformed all established baselines | ⚠️ No Improvement |
+| Train-key uniqueness check | All 668,665 training keys were unique | N/A | Confirmed the data did not contain a deterministic duplicate-key shortcut | 🔬 Research |
+
+## Version 17 — Confirmed LB 0.94612 (2026-09-11)
+
+No fold-level feature importances were reported. This entry records the RealMLP architecture and the V14-derived feature representation.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| V14 full feature pipeline | Digits, smooth keys, targeted bigrams/trigrams, frequency features, and original target means | N/A | Supplied the full engineered input representation | ✅ Used |
+| Triple target encoding | Auto/10/100-smoothed target encodings across selected categorical-like columns | N/A | Added categorical signal for the neural model | ✅ Used |
+| PBLD embeddings | Piecewise-linear/binned numerical embeddings used by RealMLP | N/A | Converted numerical patterns into learnable representations | ✅ Used |
+| 8-model ensemble | Eight RealMLP ensemble members averaged for prediction | N/A | Reduced neural-model variance | ✅ Used |
+| EMA and label smoothing | Exponential moving average plus smoothed training targets | N/A | Stabilized the short three-epoch training regime | ✅ Used |
+| Original-data concatenation | Competition data combined with original data per fold | N/A | Preserved the proven V14 training setup | ✅ Used |
+
+## Version 16 — Confirmed LB 0.94625 (2026-09-11)
+
+Importance is the reported fold-1 XGBoost feature importance. No isolated ablation was run, so impact records observed model contribution in the submitted V16 model.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `_ECL_x_Subsidy` | `Environmental_Concern_Level * Subsidy_Available` interaction | 34.0651 | Strongest overall fold-1 signal | ✅ Used |
+| `TE_trigram_Sub_ECL_RA` | Target encoding of subsidy × environmental concern × range anxiety | 20.3502 | Strongest interaction encoding | ✅ Used |
+| `TE__ECL_x_Subsidy_cat` | Target encoding of environmental concern × subsidy categories | 9.1921 | Strong categorical interaction encoding | ✅ Used |
+| `_ev_recipe` | Engineered EV recipe feature | 8.5334 | Major composite adoption signal | ✅ Used |
+| `_ECL_x_RangeAnxiety` | `Environmental_Concern_Level * Range_Anxiety_Level` interaction | 5.9434 | Strong behavioral interaction | ✅ Used |
+| `TE_bigram_ECL_bin_x_Subsidy` | Target encoding of ECL bin × subsidy | 2.3350 | Strong targeted bigram signal | ✅ Used |
+| `Environmental_Concern_Level` | Raw environmental concern level | 2.1165 | Preserved direct environmental signal | ✅ Used |
+| `TE_income100_floor` | Target encoding of the 100-dollar income floor key | 1.2917 | Added income-band signal | ✅ Used |
+| `TE__Income_x_Subsidy_cat` | Target encoding of income × subsidy categories | 1.1424 | Added affordability interaction | ✅ Used |
+| `TE__log_Income_cat` | Target encoding of log-income categories | 1.0560 | Added nonlinear income-shape signal | ✅ Used |
+| `TE__ECL_x_RangeAnxiety_cat` | Target encoding of environmental concern × range anxiety categories | 0.9369 | Added behavioral categorical interaction | ✅ Used |
+| `TE_Annual_Income_USD_cat` | Target encoding of income-as-string categories | 0.9294 | Added exact-income categorical signal | ✅ Used |
+| `Range_Anxiety_Level_fe` | Frequency encoding of range anxiety level | 0.7350 | Added compact anxiety prevalence signal | ✅ Used |
+| `TE_income_exact_int` | Target encoding of exact integer income | 0.6939 | Captured repeated exact-income structure | ✅ Used |
+| `TE_bigram_ECL_bin_x_RangeAnxiety` | Target encoding of ECL bin × range anxiety | 0.5194 | Added targeted anxiety interaction | ✅ Used |
+
+### V16 forensic-targeted features
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `TE_bigram_Sub_HomeCharging` | Target encoding of subsidy × home-charging possibility | 0.1375 | Strongest forensic feature, but small overall contribution | ✅ Used |
+| `_recipe_sub_income` | Recipe/subsidy/income interaction | 0.0370 | Captured subgroup lift but added limited global signal | ✅ Used |
+| `_dist_to_buyer_centroid_ECL3` | Fold-safe distance to buyer centroid within ECL=3 | 0.0366 | Added small geometric subgroup signal | ✅ Used |
+| `_dist_to_buyer_centroid_ECL1` | Fold-safe distance to buyer centroid within ECL=1 | 0.0353 | Added small geometric subgroup signal | ✅ Used |
+| `_dist_to_buyer_centroid_ECL2` | Fold-safe distance to buyer centroid within ECL=2 | 0.0340 | Added small geometric subgroup signal | ✅ Used |
+
+## Version 14 — Confirmed LB 0.94630 (2026-09-10)
+
+Importance is the reported fold-1 XGBoost feature importance. No isolated ablation was run, so impact records observed model contribution in the submitted V14 model.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| `_ECL_x_Subsidy` | `Environmental_Concern_Level * Subsidy_Available` interaction | 39.9435 | Strongest fold-1 signal | ✅ Used |
+| `TE_trigram_Sub_ECL_RA` | Target encoding of subsidy × environmental concern × range anxiety | 18.3191 | Strongest interaction encoding | ✅ Used |
+| `_ev_recipe` | Engineered EV recipe feature | 9.2675 | Major composite adoption signal | ✅ Used |
+| `TE__ECL_x_Subsidy_cat` | Target encoding of environmental concern × subsidy categories | 6.5782 | Strong categorical interaction encoding | ✅ Used |
+| `_ECL_x_RangeAnxiety` | `Environmental_Concern_Level * Range_Anxiety_Level` interaction | 6.3003 | Strong behavioral interaction | ✅ Used |
+| `Environmental_Concern_Level` | Raw environmental concern level | 1.7572 | Preserved direct environmental signal | ✅ Used |
+| `TE_bigram_ECL_bin_x_Subsidy` | Target encoding of ECL bin × subsidy | 1.3927 | Strong targeted bigram signal | ✅ Used |
+| `TE__Income_x_Subsidy_cat` | Target encoding of income × subsidy categories | 1.2637 | Added affordability interaction | ✅ Used |
+| `TE_income100_floor` | Target encoding of the 100-dollar income floor key | 1.0890 | Added income-band signal | ✅ Used |
+| `TE__ECL_x_RangeAnxiety_cat` | Target encoding of environmental concern × range anxiety categories | 0.9194 | Added behavioral categorical interaction | ✅ Used |
+
+### Pseudo-labeling configuration
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| High-confidence pseudo-labels | Teacher probability `p>=0.98` or `p<=0.02` | N/A | Added 150,859 test rows at half weight | ✅ Used |
+| V10 teacher predictions | Test probabilities from V10 LightGBM | N/A | Supplied pseudo-labels for the V12 XGBoost student | ✅ Used |
+
 ## Version 13 — Confirmed LB 0.94568 (2026-09-09)
 
 No fold-level feature importances were reported. This entry records the selected feature architecture and observed model contribution.
