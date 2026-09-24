@@ -43,6 +43,203 @@ The format block stays first; version entries are written below it.
 
 ---
 
+### Version 30 (Plain single model: V19 FE + 10-Fold XGBoost) - 2026-09-21
+
+**Score**: **0.94639 LB** / 0.946171 OOF (10-fold) (Gap: +0.00022)
+**Device**: GPU (cuda)
+**Result**: **+0.000097 OOF vs V28's 5-fold figure / −0.00002 LB**
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Load + full FE | ~2.3 min |
+| 10 folds × 4.0–4.7 min | 42.9 min |
+| Total | **45.3 min** (I estimated 25–30 and was wrong: doubling folds costs 4.2× wall time, not 2×, because each model also trains on 12.5% more rows) |
+
+**Fold Scores (10-fold, 66,866 validation rows each):**
+| F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 | Mean ± SD |
+|----|----|----|----|----|----|----|----|----|-----|-----------|
+| 0.94640 | 0.94617 | 0.94570 | 0.94488 | 0.94810 | 0.94637 | 0.94572 | 0.94565 | 0.94663 | 0.94621 | 0.946182 ± 0.000799 |
+
+**Strategy:** The plainest script in the series, deliberately: one matrix, one estimator, one loop — **no arms, no ablation harness, no blending, no full-data refit, no prior, no cross-fitting, no DeLong**. The only difference from V22's winner is `N_FOLDS = 10`, which makes every model train on 90% of the labels instead of 80% (601,798 + 9,000 orig rows per fold vs 534,932 + 8,000). Verified before shipping rather than asserted: the feature-engineering section is **byte-identical to V28's** (matching sha256), the XGBoost parameter dict diffs as **identical**, and the training call was switched to the booster API because our own audit showed V22's sklearn-wrapper path ranks the test board ~1,600 positions differently on an identical config — otherwise the fold count would not have been the only variable.
+**File:** `S6E9_V30_XGB_10Fold.py`
+
+**Key Learning:**
+
+> **The fold count is real but smaller than advertised, and the deployed model is strictly better for it.** Pooled 10-fold OOF 0.946171 vs the 5-fold 0.946074 = **+0.000097**, about two-thirds of the externally measured +0.00015 — with the caveat that the two numbers are not the same quantity (different validation rows, 12.5% more training rows per model, and a 10-fold nested TargetEncoder). What is not ambiguous: each of the ten models that average into the submission sees 90% of the labels where the five models saw 80%, so this is the best-trained model we have built, and its OOF is the least biased estimate of it we have.
+>
+> **Evidence that the OOF is now a better proxy: our LB−OOF gap collapsed from a stable +0.00032/+0.00035 to +0.00022.** That shrinkage is not luck — a 10-fold OOF is closer to the ensemble-of-10 that actually predicts the test set, so less of the usual optimism is left on the table.
+>
+> **The divergence rule predicted this submission to the band.** Recomputed over all ten versions that share this matrix: **Spearman(mean |rank − consensus rank|, LB) = −0.770** (it was −0.667 before V29/V30). V30's divergence is 1,111, and the neighbours at 917–1,140 (V20, V23, V27) score 0.94638–0.94641. In other words: the +0.000097 of true improvement was worth about −0.00001 on the public 20%, because the fold change also moved the test ranking slightly away from our consensus — and the board bills for movement, not for merit. **A better model and a better score are decoupled at this altitude; only the model is worth optimising.**
+>
+> **Cost lesson for the fold-count lever, since it is the one we will ship:** 10 folds ≈ 45 min, and the same logic implies 20 folds ≈ 90 min for a fraction of the remaining gain (3→20 splits measured +0.00015 total), so fold count is now spent, not underexplored.
+
+**Status:** ✅ Best model we have built; board-neutral by design. V23 (0.94641) remains the best *score*, V30 the best *estimate* — the two differ by one noise unit.
+
+### Version 29 (TabM + in-run XGBoost control, dual view) - 2026-09-21
+
+**Score**: **0.94640 LB** / 0.94607 OOF (Gap: +0.00033) — the saved model is the **control**, so this repeats V22's score exactly
+**Device**: GPU (cuda), PyTorch 2.10.0+cu128, pytabkit auto-installed
+**Result**: **TabM OOF 0.94564 (−0.00043 vs the control)** | blend not measured (reporting bug)
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Load + full FE | ~2.0 min |
+| View A — XGBoost control, 5 folds | 10.1 min |
+| View B — TabM, 5 folds | **12.7 min (2.0–3.1 min per fold)** |
+| Total | **32.4 min** |
+
+**Fold Scores (AUC, XGBoost control / TabM, rank correlation between them):**
+| Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean |
+|--------|--------|--------|--------|--------|------|
+| 0.94613 / 0.94584 / 0.99619 | 0.94515 / 0.94484 / 0.99642 | 0.94717 / 0.94684 / 0.99570 | 0.94563 / 0.94529 / 0.99578 | 0.94636 / 0.94590 / 0.99514 | 0.94609 / 0.94574 |
+
+**Strategy:** Answer the one family question never tested here — **no neural model has ever run on the V19+ artifact matrix** (V6 used 83 pre-V19 features, V7/V13 likewise, V17 ran on the corrupted digit block). TabM was chosen because it is the only non-tree family that was simultaneously strong and cheap here (V6: OOF 0.94585 in 43.9 min) and the best non-tree blend leg measured offline (+0.000093, z = +7.5). Both views trained in one script (single-model rule), with the NN fed per fold only the **top 120 columns by that fold's own freshly trained control gain** — nested, leak-free, and a ~2.6× budget cut — under a fold-0 time canary, and blended with **one linear weight chosen cross-fitted** because a non-linear combiner on this board measured CV +0.0005 against LB −0.0004.
+**File:** `S6E9_V29_TabM_DualView.py`
+
+**Key Learning:**
+
+> **The neural family is not the missing piece.** TabM on our matrix reached OOF 0.94564 — 0.00043 behind the control and *behind* V6's 0.94585 on the older, smaller feature set — while its predictions ranked **0.9951–0.9964** with the GBM's. Weak and correlated is the worst combination for a blend: V6's leg, which was better *and* less correlated, bought +0.000093, so this one predicts ≈ +0.00005 — half of a submission gate we can already measure. That is why the lost blend number is not worth a rerun. The useful nugget: **TabM is cheap** (12.7 min for five folds vs the GBM's 10.1), so if a genuinely different *feature view* is ever wanted, an NN is nearly free to add.
+>
+> **A save-path bug of mine, harmless to the score but it invalidates one conclusion I drew.** V29's log printed `test prediction range: 0.5000 .. 0.7310` — that is `sigmoid(probability)`, because the save block applies `_sigmoid` unconditionally while the no-blend branch already holds probabilities. AUC and rank are invariant, so the OOF (0.946074) and LB (0.94640) are unaffected, but **`oof_v29.csv`/`sub_v29.csv` are monotone-squashed, not calibrated — never feed them to anything that reads values rather than ranks.** It also means "V28 and V29 agree" is true of their *ranks*, not their values.
+>
+> **Reproducibility, on ranks.** Of three saved copies of V22's estimator, V28's and V29's controls rank **identically** (mean |rank difference| 0.0 rows, OOF and test) — the pipeline is reproducible across sessions including the GPU. V22 itself, run through the sklearn wrapper instead of the booster API, ranks differently by a mean 1,600 OOF and 532 test positions **and still scored the identical LB 0.94640**: a ~0.2% rank perturbation is invisible to the board.
+>
+> **The real reason recent versions look worse — measured across the eight versions that share this matrix (V19, V20, V22, V23, V25, V26, V27, V28).** Their OOF spans only **0.000107** while their LB spans **0.000130** — the board adds spread rather than resolving quality — and **Spearman(OOF, LB) across them is −0.619: the best-OOF models score *worse* publicly.** V25 has the highest OOF we have ever produced (0.946094) and the lowest LB of the eight (0.94628); V19 has the *lowest* OOF (0.945987) and is joint second-best on LB. What does predict the board is **divergence from our own consensus ranking**: Spearman(mean |rank − consensus rank|, LB) = **−0.667**, and the four best-scoring submissions are precisely the four least divergent (838–1,061 positions) while the two most divergent (V25 at 2,343, V19 at 1,813) sit at the bottom and middle. Interpretation: every one of these models has essentially the same expected AUC, so a change that reshuffles the test board buys variance without bias reduction, and the public slice punishes the variance. **The board has not been measuring our quality for six versions; it has been measuring how much we disturbed the ranking.**
+>
+> **Process failure owned precisely:** the blend block raised `ValueError: too many values to unpack` because two call sites unpacked `paired_z`'s 4-tuple into 3 names — the identical bug fixed in V28 the day before. The earlier "unit test" caught nothing because it called `paired_z` with a *correct* 4-name unpack instead of executing the script's real line: **testing a paraphrase of the call site is not testing the call site.** The guard held — outputs saved, control result intact, verdict printed — but a guarded crash that silently downgrades the deliverable still cost the run's whole purpose. Fix: grep every call site of a multi-return helper, not the helper.
+
+**Status:** ❌ Failed to add value (family axis closed as a source of gain) — ✅ guard worked, zero artifacts lost, control reproduced V22's LB exactly
+
+### Version 28 (XGBoost Bin Resolution: max_bin 1024 → 16384) - 2026-09-21
+
+**Score**: **0.94640 LB** / 0.94607 OOF (Gap: +0.00033) — CV-only probe, deliberately not promoted
+**Device**: GPU (cuda)
+**Result**: **−0.000002 OOF vs the in-run control (z = −0.40, tie)**
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Load + full FE | ~1.5 min |
+| a0 control (max_bin 1024), 5 folds | 10.7 min |
+| a1 raised (max_bin 16384), 5 folds | 45.3 min (**4.2× the control**) |
+| Total | **66.5 min** |
+
+**Fold Scores (winner a0):**
+| Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean |
+|--------|--------|--------|--------|--------|------|
+| 0.94613 | 0.94515 | 0.94717 | 0.94563 | 0.94636 | 0.94609 |
+
+a1's fold AUCs: 0.94612 / 0.94515 / 0.94716 / 0.94564 / 0.94636 — identical to five decimals on two folds.
+
+**Strategy:** Change exactly one parameter on the real 312-column pipeline, with an in-run control that must reproduce V22 (it did: 0.94607 vs stored 0.946076, the sixth consecutive validation of the shared-build harness). Income holds 14,667 distinct values across the pool and is the *only* column of 13 above a 1024-bin cap, so 16384 is not "more bins" — it is unconstrained binning, the last point on the axis. A first run of this version had tested 4096 (delta −0.00000, z = −0.21) and the rerun went to full resolution so the answer could not be "you stopped short".
+**File:** `S6E9_V28_XGB_BinResolution.py`
+
+**Key Learning:**
+
+> **The resolution axis is closed by construction, and the community's +0.00201 was ours years ago.** 16× the bins moved nothing. An integrity guard settled the "was the parameter even applied?" question from the fitted trees themselves: income-derived columns used 6,456 distinct thresholds at max_bin 1024 vs **7,972 at 16384** (e.g. `TE_Annual_Income_USD_cat_auto` 318 → 538 cuts), and the arms stopped at different tree counts on every fold — so the tie is a real null, not a silently ignored setting. That matches every additive proxy measured offline (per-value income lookup stacking: +0.000004…+0.000010; raw income significantly *worse* at z = −3.2; the model's per-bin income tracking already at the split-half reliability ceiling). The thread's +0.00201 was raised on a 0.94172 baseline that lacked both the fixed digit block and the exact-value TE stack — **we banked that lever in V19**, which is also why the raised cap and the digits measured as the *same* +0.00201 there. Two secondary findings: the two bin settings' predictions correlate 0.99992, so bin resolution is not a diversity source for blending (blend +0.00000, z = +1.20); and reproducing V22's estimator reproduced its LB **to the last digit** (0.94640), which is the cleanest evidence yet that LB differences of ±0.00001-0.00002 between near-identical models are model difference, not board randomness. Also: 4.2× cost for zero gain retires any further sweep of this knob — keep 1024 permanently. Process note: the first run's 31 min of GPU work was lost because a `paired_z` unpacking bug threw *after* training but *before* saving; outputs are now written before any post-hoc diagnostic, and the diagnostics are guarded.
+
+**Status:** ⚠️ CV-only null by design — axis closed, no submission value, `max_bin` stays 1024
+
+### Version 27 (XGBoost Structural Ablation: original-row weight + pairwise loss) - 2026-09-20
+
+**Score**: **0.94638 LB** / 0.94608 OOF (Gap: +0.00030)
+**Device**: GPU (cuda)
+**Result**: **-0.00003 LB vs V23 — probe only, not promoted**
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Stage A fold 1 (5 arms) | 13.9 min |
+| Stage A fold 2 | 13.2 min |
+| Stage A fold 3 | 10.7 min |
+| Stage A fold 4 | 11.2 min |
+| Stage A fold 5 | 17.7 min (split total 66.7 min) |
+| Stage B | skipped (no arm cleared z > 3) |
+| Total | 69.6 min |
+
+**Fold Scores (winner a1, rs=42):**
+| Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean |
+|--------|--------|--------|--------|--------|------|
+| 0.94613 | 0.94514 | 0.94719 | 0.94563 | 0.94635 | 0.94609 |
+
+**Strategy:** Third use of the ablation harness, aimed at the two structural assumptions every version since V1 has shared. a0 = V20/V23's exact config as the control. a1 removes the original 10k rows from the per-fold concat. a2 keeps them at sample weight 10. a3 swaps `binary:logistic` for `rank:pairwise` (rows shuffled into contiguous random groups of 64, so within-group pairs are a uniform subsample of the global positive-negative pairs AUC averages over) and early-stops on `auc`, which XGBoost accepts for ranking objectives. a4 = a3 with the original rows replicated 10x, because this XGBoost build rejects `weight` together with `set_group` and duplication is the exact pairwise-loss equivalent of up-weighting.
+**File:** `S6E9_V27_XGB_StructuralAblation.py`
+
+**Key Learning:**
+> a0 landed on 0.94605 against V20's stored 0.946060, so the control held again. Two clean answers. **(1) The original 10k rows are not earning their concat: dropping them gives +0.00002 at z = +2.66** — a tie, but a tie in the *right* direction, with 1.47% of the training matrix removed and no loss; up-weighting them ×10 goes the other way (-0.00003, z = -2.30). Every original-data claim we have made since V1 is really about the pool/original *frequency* features, not about training on those rows. **(2) The pairwise-loss theory is dead: `rank:pairwise` loses 0.000329 at z = -42.56**, and it is unstable across folds (0.94420 to 0.94624, converging anywhere between 416 and 3,827 trees). Replicating the original rows *inside* the ranking objective recovers most of that (-0.00069) but still loses badly. Pointwise logloss is already close to optimal for the ranking here — the model's calibration is its ranking, and a surrogate that ignores absolute probabilities throws away real signal. Winner a1's OOF 0.94608 equals V22's best and its gap to LB (+0.00030) sits back inside the normal band, unlike V25's.
+
+**Status:** ⚠️ Partial (probe answered both questions; no submission candidate)
+
+---
+
+### Version 26 (LightGBM ExtraTrees-Bias Probe) - 2026-09-20
+
+**Score**: **0.94637 LB** / 0.94608 OOF (Gap: +0.00029)
+**Device**: CPU (LightGBM 4.6)
+**Result**: **-0.00004 LB vs V23 — first arm ever to clear our own z > 3 gate**
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Stage A fold 1 (4 arms) | 39.2 min |
+| Stage A fold 2 | 43.2 min |
+| Stage A fold 3 | 39.4 min |
+| Stage A fold 4 | 40.7 min |
+| Stage A fold 5 | 43.7 min (split total 206.3 min) |
+| Stage B (3 arms, rs=7) | 177.9 min |
+| Total | 387.6 min (6.5 h) |
+
+**Fold Scores (winner a3, rs=42):**
+| Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean |
+|--------|--------|--------|--------|--------|------|
+| 0.94611 | 0.94517 | 0.94721 | 0.94564 | 0.94637 | 0.94610 |
+
+**Strategy:** Test the one inductive bias never used on this matrix: randomised split thresholds. Rationale — the pool is 668k rows rejection-sampled from 10k, so exact input values recur thousands of times and the label is close to a lookup on them; a greedy depth-3/4 tree can only approximate that with shared thresholds, while random thresholds over 1,024 bins in fully-grown trees can memorise value boundaries instead. a0 = V19's LightGBM params verbatim as the control, a1 = a0 + `extra_trees=True` (+ `split_histogram_sampling`, which is how LightGBM 4.x implements the bias), a2 = a1 + RF-style lookup capacity (unlimited depth, 128 leaves, `feature_fraction_bynode` 0.3, lr 0.05), a3 = a1 + V22's winning "wide, weak, many" direction (depth 3, 8 leaves, `min_child_samples` 50, colsample 0.85, lr 0.01). Stage B ran *because* arms cleared the gate.
+**File:** `S6E9_V26_LGBM_ExtraTreesProbe.py`
+
+**Key Learning:**
+> **First gate-cleared improvement since the artifact features.** a1 (ExtraTrees bias alone) beat the in-run greedy control by +0.00007 at z = +3.58, and a3 (bias + shallow/wide/weak) by **+0.00010 at z = +5.22 on rs=42 and +0.00008 at z = +4.11 on rs=7** — reproduced on both splits, which nothing has done since V19. The lookup arm failed hard (a2 -0.00023, z = -8.00), so random thresholds help as *regularisation of a shallow model*, not as memorisation: my stated mechanism was wrong even though the direction paid. a0 also reproduced V19 (0.94599 vs stored 0.945987). **The catch: this beat LightGBM, not XGBoost.** a3's 0.946085 only ties V22/V27's 0.946076-0.946078 (z = +1.60 vs V23) and sits below V25's 0.946094. What it really says is that the 0.00007 LightGBM→XGBoost gap was a *split-bias* gap, not an information gap — once LightGBM is allowed random thresholds it catches up. That makes the ET direction the most promising unexplored tuning surface we have (one config of one grid already gained +0.00010), at a brutal cost: 6.5 h of CPU because a3 needs 6,000-8,200 trees per fold.
+
+**Status:** ✅ Good (best reproducible gain since V19; LB did not move, see the noise-floor note in daily_log 20-09-2026)
+
+---
+
+### Version 25 (XGBoost Factorial Ablation: cross keys / recipe prior / gain pruning) - 2026-09-19
+
+**Score**: **0.94628 LB** / 0.94609 OOF (Gap: +0.00019 — our best OOF, and a broken OOF→LB relation)
+**Device**: GPU (cuda)
+**Result**: **-0.00012 LB vs V22 — submission reverted to the V23 line**
+
+**Timing:**
+| Stage | Time |
+|-------|------|
+| Stage A fold 1 (5 arms) | 9.7 min |
+| Stage A fold 2 | 10.9 min |
+| Stage A fold 3 | 10.2 min |
+| Stage A fold 4 | 10.7 min |
+| Stage A fold 5 | 11.6 min (split total 53.2 min) |
+| Stage B (3 arms, rs=7) | 33.8 min |
+| Total | 90.2 min |
+
+**Fold Scores (winner a2, rs=42):**
+| Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | Mean |
+|--------|--------|--------|--------|--------|------|
+| 0.94612 | 0.94512 | 0.94721 | 0.94570 | 0.94635 | 0.94610 |
+
+**Strategy:** Instead of bundling three ideas into one model, run them as a **factorial ablation** in one script: one feature build per fold shared by all arms, an in-run control equal to V22's winning config, and four arms that each change exactly one factor. a1 = V21's six cross keys as a PURE addition (312 base-block + 54 cross-block columns; the cross block is appended last and excluded from the redundancy scan, so a0's matrix is V22's); a2 = per-row `base_margin` from a logistic fitted on the original 10k rows only, per fold, clipped to ±5; a3 = in-run gain pruning to 94 features via a 600-tree lr-0.05 probe on that fold's own training rows; a4 = all three. Stage A on rs=42, top-3 + control re-run on rs=7, winner by two-split mean, submission averaged over both splits. Every arm judged against the control by a paired DeLong computed from this run's own OOF vectors. 90.2 min, faster than V22 despite more arms.
+**File:** `S6E9_V25_XGB_FactorialAblation.py`
+
+**Key Learning:**
+> The harness worked and the science is the useful part. **a0 reproduced V22 exactly** (0.94607 vs V22's stored 0.946076, 6e-6 apart), which validates the shared-build design. Ranking: a2 0.94609, a0 0.94607, a3 0.94603, a4 0.94602, a1 0.94601. In-run paired DeLong vs control: **a1 -0.00006 at z=-3.98 (reject)**, a3 -0.00004 at z=-2.77, a4 -0.00005, **a2 +0.00002 at z=+1.29** (rs=7: +0.00004 at z=+2.45). So V21's crosses are now **cleanly acquitted of the blame and rejected on their own merits** — the last open feature door is shut — and the reference recipe's 94-feature pruning does not transfer to our matrix. Only the recipe prior shows a pulse, and only at tie strength.
+>
+> Then the discipline test: **I promoted a tie to a submission and it cost 0.00012 LB.** Offline forensics on the saved predictions show this was not a code error. (1) The submission file is clean: 286,541 unique of 286,571 values, no NaN, range 3.9e-6 to 0.9996. (2) The prior is *symmetric* between train and test — clipped on 20.82% of train vs 20.72% of test rows, entirely on the -5 side (0% at +5), and V25's OOF vs test prediction distributions match to four decimals (logit mean -3.757 vs -3.738, sd 3.243 vs 3.223), so there is no test-side extrapolation failure. (3) The real asymmetry is *magnitude of change*: mean |rank difference| vs V22's submission is 2,725 rows with 31% of the board moving more than 1% of ranks, versus 1,598/16% for V23 and 1,495/14% for V20 — a tie-sized gain that reshuffled twice as much as V23's blend, and V21 (the other version that dropped ~0.00011) has an almost identical profile at 2,874/36%. (4) Where the +0.000018 came from is the most diagnostic fact: bucketed by V22's prediction decile, a2's movement is +0.0324 / -0.0151 / -0.0162 in the bottom three deciles and flat to ±0.0012 above them — and those deciles hold 174 of 116,779 positives, i.e. **0.15% of the AUC's pair mass**. The prior buys nothing where the metric lives; it reorders where the metric is blind. (5) Finally, public LB cannot order our submissions at this scale: V19's OOF is 0.000107 *worse* than V25's yet its LB is 0.00011 *better*. **New rule adopted: a submission slot only for an arm that clears z > 3 on OOF, or for an inference-side variant of V23; ties stay CV experiments.**
+
+**Status:** ⚠️ Partial (best OOF 0.94609; LB regressed because a tie was submitted)
+
+---
+
 ### Version 24 (CatBoost depth=6 on the V19/V20 Artifact Matrix) - 2026-09-19
 
 **Score**: **0.94615 LB** / 0.94593 OOF (Gap: +0.00022)

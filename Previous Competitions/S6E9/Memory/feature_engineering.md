@@ -17,6 +17,94 @@ The format block stays first; feature entries are written below it.
 
 ---
 
+## Version 30 — Confirmed LB 0.94639 (2026-09-21) ✅ Best model built; zero feature changes
+
+The FE section is **byte-identical to V28/V22's** (verified by hashing the pipeline region, not by eye) and the XGBoost config is identical to V22's winner — deliberately, because this version changed exactly one thing: **10 folds instead of 5**, so each model trains on 90% of the labels (601,798 + 9,000 original rows per fold) instead of 80%.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| Fold count (a training change, not a feature change) | `N_FOLDS = 10`, which also drives the per-fold original-row concat and the nested `TargetEncoder(cv=10)` | 10-fold OOF **0.946171** vs 5-fold 0.946074 = **+0.000097** (external claim +0.00015); folds 0.94488–0.94810, SD 0.000799 | The only remaining measured, mechanism-free gain and it is now spent: 20 folds costs ~90 min for a fraction more. Wall time scales 4.2× not 2×, because each fold also trains on more rows | ✅ Used |
+| Nested 10-fold TargetEncoder | Same Triple TE (auto/10/100) but fitted inside 10 inner folds rather than 5 | Included in the +0.000097; not separable from the fold count by design | Encoding smoothness is a known 0.0002-scale lever (thread 739354: smoothing 5→200 moves 0.0002) and is now folded in, not swept | ✅ Used |
+| OOF→LB gap as a proxy-quality signal | LB minus OOF | **collapsed from a stable +0.00032/+0.00035 to +0.00022** | A 10-fold OOF sits closer to the ensemble-of-ten that actually predicts test, so less optimism remains — evidence the estimate itself improved, independent of the board | 🔬 Research |
+| Consensus divergence, recomputed over 10 versions | Spearman(mean \|rank − consensus rank\|, LB) | **−0.770** (−0.667 before V29/V30). V30 divergence 1,111 → LB 0.94639, matching neighbours at 917–1,140 (V20/V23/V27) | Confirms the rule with a tenth data point: the board prices *movement in the test ranking*, not merit. V30 gained +0.000097 of true accuracy and lost 0.00001 of public score | 🔬 Research |
+| Script shape | No arms, no harness, no blend, no refit, no prior, no DeLong — 774 lines, one loop | Ran first time, 45.3 min | The plain single-model form is now the template for shipping; the ablation harness is for killing ideas, not for building them | ✅ Used |
+
+## Version 29 — Confirmed LB 0.94640 (2026-09-21) ❌ Neural family adds nothing; axis closed
+
+No feature changes. This version asked whether a neural model can exploit the V19+ artifact stack at all — the one family question never tested on this matrix. Control = V22 winner in-run, landing on 0.94607 vs V22's stored 0.946076; the saved submission is that control, which is why the LB repeats V22's 0.94640.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| TabM on the artifact matrix | pytabkit `TabM_D_Classifier`, k=4, PWL numeric embeddings d=16, d_block 128, n_blocks 2, batch 4096, 25 epochs | OOF **0.94564** vs control 0.94607 (**−0.00043**); per-fold 0.94584/0.94484/0.94684/0.94529/0.94590 | First neural run on this matrix and it loses — but it also *underperformed V6's 0.94585 on the older 83-feature set*, so nets do not exploit the artifact stack better than trees | ❌ Removed |
+| Correlation with the GBM | rank correlation per fold between the two views | **0.99514–0.99642** | Weak *and* correlated — the worst quadrant for a blend leg. V6's TabM (better and less correlated, ρ 0.9952) bought +0.000093, so this predicts ≈ +0.00005 | ❌ Removed |
+| Nested column budget | per fold, the NN sees only the top 120 of 312 columns by **that fold's own** control gain (534,932 training rows; no validation label involved) | Fold-1 picks: `TE_lift_trigram_cat_auto`, `TE_lift_trigram_cat_10`, `Environmental_Concern_Level`, `_ev_recipe`, then the income/ECL TEs | Leak-free way to cut NN cost ~2.6×; also confirms the gain ranking matches the feature story from V20 onward | 🔬 Research |
+| Cost of the family | 12.7 min for five folds vs the GBM's 10.1 min | — | An NN leg is nearly free to add if a *different feature view* ever justifies it; the family itself is not the blocker | 🔬 Research |
+| Reproducibility audit | three saved copies of V22's estimator (V22, V28 control, V29 control) | V28 vs V29 rank **identically** (mean rank difference 0.0 rows, OOF and test). V22 (sklearn wrapper, not booster API): mean rank difference 1,600 OOF / 532 test rows — **same LB 0.94640** | The pipeline is reproducible across sessions including the GPU, and a rank perturbation of ~0.2% of positions is invisible on the public board. Caveat: V29's files are `sigmoid(probability)` because of a save-path bug, so the *values* are squashed (0.5000–0.7310) even though ranks/AUC are unaffected — compare these files by rank only | 🔬 Research |
+| Board-vs-OOF reversal | Across the eight versions sharing this matrix (V19/20/22/23/25/26/27/28): OOF span 0.000107 vs LB span 0.000130 | **Spearman(OOF, LB) = −0.619**; Spearman(test-board divergence from our consensus, LB) = **−0.667**. Best OOF (V25 0.946094) has the lowest LB (0.94628); lowest OOF (V19 0.945987) is joint 2nd-best on the board (0.94639) | For six versions the public board has not been ranking our quality — it has been punishing how much a change disturbed the test ranking. The four least divergent submissions are the four best-scoring ones. Decision rule that follows: among equal-OOF candidates submit the **least divergent** model, and treat any board move below ~0.00013 as unmeasurable | 🔬 Research |
+
+## Version 28 — Confirmed LB 0.94640 (2026-09-21) ⚠️ CV-only null, resolution axis closed
+
+No feature changes (V22's 180 base + 198 Triple TE = 312 fitted columns, unchanged). This version tested whether the *existing* exact-value features are being throttled by the histogram bin cap, so the entry records resolution diagnostics rather than importances. Control a0 = V22 winner, landing on 0.94607 vs V22's stored 0.946076.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| `max_bin` 1024 → 16384 | Unconstrained binning: income holds 14,667 distinct pool values (13,214 train) and is the only column of 13 above the cap; commute, the next largest, is 0.81× | OOF **−0.000002, z = −0.40** (4096 gave −0.00000, z = −0.21) for **4.2× the GPU time** | The axis is closed by construction — there is no higher setting to try | ⚠️ No Improvement |
+| Integrity guard (trees, not requests) | Distinct thresholds actually used across all 62 income-derived columns | 1024 bins → **6,456**; 16384 → **7,972**; `TE_Annual_Income_USD_cat_auto` 318 → 538 cuts; `_10` variant 336 → 558; 62/62 vs 61/62 income columns used as splits | Proves the parameter reached the model, so the tie is a real null and not a silently ignored setting. Keep this guard pattern for any representation-level test | 🔬 Research |
+| Income columns that dominate splitting | Fold-1 distinct-cut counts | `grp_income_bin_Annual_Income_USD_dev` 339, `TE_Annual_Income_USD_cat_10` 336, `TE__log_Income_cat_100` 334, `TE_Annual_Income_USD_cat_auto` 318 (1,175 splits) | The model is already carving income finely through the TE/groupby stack — which is exactly why the raw bin cap was never the binding constraint | ✅ Used |
+| Resolution as a blend source | Equal-logit blend of the 1024 and 16384 arms' OOF | rank corr **0.99992**, blend +0.00000, z = +1.20 | Different bin settings are the same model. Diversity must come from a different *feature view* or family, not from representation knobs | ❌ Removed |
+| Estimator fidelity | Same config, same folds, same matrix as V22 | OOF 0.94607 vs 0.946076 **and LB 0.94640 identical to the last digit** | Strong evidence that ±0.00001 LB moves between near-identical models are model difference, not board noise | 🔬 Research |
+
+## Version 27 — Confirmed LB 0.94638 (2026-09-20) ⚠️ Probe, not promoted
+
+No feature changes (V20's 180 base + 198 Triple TE). This version ablated two *structural* assumptions instead. Control a0 = V20's config, landing on 0.94605 vs V20's stored 0.946060.
+
+| Item | Definition | Result vs a0 | Impact | Status |
+|------|------------|--------------|--------|--------|
+| Original 10k rows in the per-fold concat | 8,000 extra rows per fold = 1.47% of the training matrix | a1 drops them **+0.00002, z = +2.66** | Tie in the *removal* direction: the rows are not earning their place; our original-data gains are the pool/orig **frequency** features, not the rows | ⚠️ No Improvement |
+| Original rows at sample weight 10 | `DMatrix(weight=)` on the 8,000 orig rows | a2 **-0.00003, z = -2.30** | Clean-label supervision from the source file does not transfer — do not pursue | ❌ Removed |
+| `objective = rank:pairwise` | Random contiguous groups of 64 rows = uniform subsample of the global positive-negative pairs AUC averages over | a3 **-0.000329, z = -42.56** | The pairwise-AUC theory is dead. Fold AUCs swing 0.94420-0.94624 and convergence ranges 416-3,827 trees | ❌ Removed |
+| Pairwise + orig rows replicated 10x | Duplication stands in for weight (this build rejects `weight` + `set_group`; equal under a pairwise loss) | a4 **-0.00069, z = -19.89** | Replicating clean-label rows recovers most of the pairwise damage but still loses | ❌ Removed |
+| `eval_metric='auc'` on a ranking objective | Accepted by XGBoost 3.2 — early stopping can watch the real metric | — | Useful mechanism knowledge even though the objective failed | 🔬 Research |
+
+## Version 26 — Confirmed LB 0.94637 (2026-09-20) ✅ First gate-cleared gain since V19
+
+No feature changes (V19/V22's 180 base + 198 Triple TE). The change is the tree *split* bias inside LightGBM, so this entry records what the bias did to the feature story. Control a0 = V19's params, landing on 0.94599 vs V19's stored 0.945987.
+
+| Item | Definition | Result vs a0 | Impact | Status |
+|------|------------|--------------|--------|--------|
+| `extra_trees=True` (+ `split_histogram_sampling`) | Split thresholds sampled from bin boundaries instead of chosen greedily | a1 **+0.00007, z = +3.58** | The bias itself pays — first arm ever to clear z > 3 | ✅ Used |
+| extra_trees + wide/weak/many | depth 3, `num_leaves` 8, `min_child_samples` 50, colsample 0.85, lr 0.01, ~6,000-8,200 trees | a3 **+0.00010, z = +5.22** (rs=7 +0.00008, z = +4.11) | Reproduced on both splits — the strongest single measured gain since V19's artifact features | ✅ Used |
+| extra_trees + lookup capacity | unlimited depth, 128 leaves, `feature_fraction_bynode` 0.3, lr 0.05 | a2 **-0.00023, z = -8.00** | Falsifies the memorisation mechanism: fully-grown random trees are much worse. Random thresholds work as regularisation of a *shallow* model | ❌ Removed |
+| Cross-family level | a3's OOF 0.946085 vs V22 0.946076 / V25 0.946094 | z = +1.60 vs V23 | **Ties XGBoost, does not beat it.** The 0.00007 LightGBM→XGBoost gap was a split-bias gap, not an information gap | ⚠️ No Improvement |
+| Cost | 387.6 min CPU; a3 needs 6,000-8,200 trees per fold | — | Expensive to explore, which is why only one config of this direction has been tried | 🔬 Research |
+
+## Version 25 — Confirmed LB 0.94628 (2026-09-19) ⚠️ Best OOF, submission rejected
+
+Factorial ablation on V22's matrix: nothing was removed anywhere, and each arm changed one factor against an in-run control. The cross block was appended last and excluded from the redundancy scan, so the control's matrix is V22's exactly (312 base-block columns; +54 cross-block for a1). Importance is fold-1 XGBoost gain share from the control arm.
+
+| Feature / Item | Formula / Definition | Importance % | Impact | Status |
+|----------------|----------------------|--------------|--------|--------|
+| `TE_lift_trigram_cat_auto` | Auto-smoothed TE of the trigram lift (control arm) | 23.12 gain | #1 again; auto+10 pair = 39.3% of gain in the depth-3 wide-column model | ✅ Used |
+| `TE_lift_trigram_cat_10` | Smoothing-10 TE of the trigram lift | 16.21 gain | Second view of the same key | ✅ Used |
+| `Environmental_Concern_Level` | Raw ECL column | 12.41 gain | #3 under c1-style params — raw signal reaches the top when colsample is wide | ✅ Used |
+| six cross keys + their lifts (`cx_chg_x_home`, `cx_city_x_home`, `cx_ecl_x_home`, `cx_ecl_x_city`, `cx_inc_x_ecl_x_sub`, `cx_ecl_x_sub_x_comm`) | Fixed-edge Simpson/recipe crossings, Triple-TE'd + target-free lift each (54 columns) | arm OOF **-0.00006**, z = **-3.98** | **Tested alone for the first time and REJECTED.** V21 was not the removals' fault — the crosses add nothing. The last open feature door | ❌ Removed |
+| `base_margin` = logit(LR on original 10k) | Per-fold logistic on 12 raw recipe drivers, clipped ±5, supplied per row through the booster API | arm OOF **+0.00002**, z = **+1.29** (rs=7 +0.00004, z=+2.45) | Only arm with a pulse — and it is a **tie**, below the z>3 gate. Its gain sits in the bottom 3 deciles = 0.15% of the AUC pair mass; LB then fell 0.00012 | ⚠️ No Improvement |
+| in-run gain pruning to 94 features | 600-tree lr-0.05 probe on the fold's own training rows, top-94 by gain | arm OOF **-0.00004**, z = -2.77 | The reference recipe's 94-feature budget does NOT transfer to our 378-feature matrix | ❌ Removed |
+| all three combined | cross + prior + pruning | arm OOF -0.00005, z = -2.55 | No positive interaction to rescue; the prior's tiny edge survives neither the crosses nor the pruning | ❌ Removed |
+
+### V25 post-mortem diagnostics (offline, on saved oof/sub CSVs)
+
+| Diagnostic | Value | Reading |
+|------------|-------|---------|
+| Control a0 OOF vs V22's stored OOF | 0.94607 vs 0.946076 | Harness reproduces the previous version to 6e-6 |
+| Paired DeLong, v25 vs v22 (668,665 rows) | +0.000018, SE 0.000015, z = +1.21 | Best OOF we have ever had, and still a tie |
+| OOF→LB gap | +0.00019 (v25) vs +0.00032…+0.00040 for every trusted model | The outlier is the submission, not the CV |
+| Test rank divergence vs v22 | mean abs rank diff 2,725; 31% of rows move >1% of the board | v23: 1,598/16%, v20: 1,495/14%, v21: 2,874/36% (v21 also lost ~0.00011) |
+| Prior clipping | 20.82% of train vs 20.72% of test rows, all at -5, 0% at +5 | No train/test extrapolation asymmetry — the arm is not broken |
+| Submission integrity | 286,541 unique / 286,571 values, no NaN, range 3.9e-6…0.9996 | No ties, no corruption |
+| Per-decile OOF delta (v25 - v22) | deciles 0/1/2: +0.0324 / -0.0151 / -0.0162; deciles 3-9 within ±0.0012 | The whole "gain" is reordering rows where AUC is nearly blind (174 of 116,779 positives) |
+| LB vs OOF monotonicity check | v19 OOF 0.000107 worse than v25, LB 0.00011 better | Public LB cannot order our submissions at the 0.0001 scale |
+
 ## Version 24 — Confirmed LB 0.94615 (2026-09-19) ❌ Rejected
 
 No new features. V20's exact matrix (180 base + 198 Triple TE) through CatBoost depth=6 to test whether the feature set family-depends. Importance is CatBoost's fold-1 percentage (predictions/gain based, sums to 100 across the full table), so values are not comparable to XGBoost gain shares above.
