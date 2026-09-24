@@ -9,6 +9,125 @@
 
 ---
 
+## **Competition name** - [Playground Series - Season 6, Episode 8](https://www.kaggle.com/c/playground-series-s6e8)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Binary Classification) 
+- **Problem:** Predict the likelihood of smartphone addiction. 
+- **Evaluation Metric:** ROC AUC Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 8](https://www.kaggle.com/c/playground-series-s6e8) 
+- **Winning Writeups:**
+  - [1st place](https://www.kaggle.com/c/playground-series-s6e8/writeups/1st-place-distributed-intelligence-nvidia-infe)
+  - [2nd place](https://www.kaggle.com/c/playground-series-s6e8/writeups/2nd-place-solution)
+  - [7th place](https://www.kaggle.com/c/playground-series-s6e8/writeups/7th-place-many-models-one-simple-stack)
+  - [14th place](https://www.kaggle.com/c/playground-series-s6e8/writeups/14th-place-278-shared-oof-sets-36-own-models)
+  - [25th place](https://www.kaggle.com/c/playground-series-s6e8/writeups/public-18-private-25-approach)
+
+---
+
+## **Competition name** - [Playground Series - Season 6, Episode 7](https://www.kaggle.com/c/playground-series-s6e7)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Multiclass Classification) 
+- **Problem:** Predict student health risk (at-risk, unhealthy, fit). 
+- **Evaluation Metric:** Balanced Accuracy Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 7](https://www.kaggle.com/c/playground-series-s6e7) 
+- **Winning Writeups:**
+  - [2nd place](https://www.kaggle.com/c/playground-series-s6e7/writeups/2nd-place-solution)
+  - [4th place](https://www.kaggle.com/c/playground-series-s6e7/writeups/4th-place-from-414-to-4-trusting-oof-when-the)
+  - [11th place](https://www.kaggle.com/c/playground-series-s6e7/writeups/rank11-approach)
+  - [29th place](https://www.kaggle.com/c/playground-series-s6e7/writeups/29th-place-ft-transformer-exact-value-target-en)
+  - [36th place](https://www.kaggle.com/c/playground-series-s6e7/writeups/pss6e7-cv-blending)
+
+---
+
+## **Competition name** - [Playground Series - Season 6, Episode 6](https://www.kaggle.com/c/playground-series-s6e6)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Multiclass Classification) 
+- **Problem:** Predict stellar class. 
+- **Evaluation Metric:** Balanced Accuracy Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 6](https://www.kaggle.com/c/playground-series-s6e6) 
+- **Winning Writeups:**
+  - [1st place](https://www.kaggle.com/c/playground-series-s6e6/writeups/1st-place-mission-300-accomplished)
+  - [6th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/6th-place-solution-trusting-the-oof-plateau)
+  - [8th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/8th-place-solution)
+  - [9th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/9th-place-solution)
+  - [12th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/12th-place)
+  - [22nd place](https://www.kaggle.com/c/playground-series-s6e6/writeups/22nd-place-solution)
+  - [23rd place](https://www.kaggle.com/c/playground-series-s6e6/writeups/23rd-private-merci-chris-deotte)
+  - [24th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/24th-place-solution)
+  - [25th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/25th-place-my-public-starter-notebook)
+  - [26th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/26th-place-writeup-predicting-stellar-class)
+  - [31st place](https://www.kaggle.com/c/playground-series-s6e6/writeups/31st-place-first-time-in-100)
+  - [33rd place](https://www.kaggle.com/c/playground-series-s6e6/writeups/33rd-place-solution)
+  - [42nd place](https://www.kaggle.com/c/playground-series-s6e6/writeups/blending-with-quasi-mc-and-tpe)
+  - [45th place](https://www.kaggle.com/c/playground-series-s6e6/writeups/45th-place-catboost-stacker-paired-with-mlp-embed)
+
+---
+
+## **Competition name** - [Playground Series - Season 6, Episode 5](https://www.kaggle.com/c/playground-series-s6e5)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Binary Classification) 
+- **Problem:** Predict whether a Formula 1 driver will pit on the next lap. 
+- **Evaluation Metric:** ROC AUC Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 5](https://www.kaggle.com/c/playground-series-s6e5) 
+- **Winning Writeups:**
+  - [1st place](https://www.kaggle.com/c/playground-series-s6e5/writeups/1st-place-by-the-skin-of-my-teeth)
+  - [2nd place](https://www.kaggle.com/c/playground-series-s6e5/writeups/2nd-place-autonomous-codex-yolo)
+  - [4th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/4th-place-5-day-rush)
+  - [5th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/5th-place-solution-a-99-model-logit-stack)
+  - [7th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/7th-place-solution)
+  - [8th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/l5-ensemble)
+  - [10th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/stacking-stacked-predictions)
+  - [11th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/11th-place-in-the-midst-of-entrance-exams)
+  - [17th place](https://www.kaggle.com/c/playground-series-s6e5/writeups/rank17-approach-diverse-models-and-blend)
+
+---
+
+## **Competition name** - [Playground Series - Season 6, Episode 4](https://www.kaggle.com/c/playground-series-s6e4)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Multiclass Classification) 
+- **Problem:** Predict irrigation need (Low, Medium, High). 
+- **Evaluation Metric:** Balanced Accuracy Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 4](https://www.kaggle.com/c/playground-series-s6e4) 
+- **Winning Writeups:**
+  - [1st place](https://www.kaggle.com/c/playground-series-s6e4/writeups/1st-place-one-vs-rest-approach)
+  - [2nd place](https://www.kaggle.com/c/playground-series-s6e4/writeups/2nd-place-claude-code-and-codex-gpu-logreg)
+  - [3rd place](https://www.kaggle.com/c/playground-series-s6e4/writeups/error-diversity-matters-200-model-stacking-soluti)
+  - [4th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/4th-place-more-ensemblers-than-models)
+  - [5th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/5th-place-solution-writeup-ai-for-large-scale-ex)
+  - [12th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/12th-place-solution-stacked-ensemble-with-ordered)
+  - [19th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/19nd-place-ensemble-of-29-models)
+  - [24th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/24th-place-a-heavy-stacking-approach-with-166-oof)
+  - [30th place](https://www.kaggle.com/c/playground-series-s6e4/writeups/ps-s6e4-retrospective-42-rank-jump-to-top-0-7)
+
+---
+
+## **Competition name** - [Playground Series - Season 6, Episode 3](https://www.kaggle.com/c/playground-series-s6e3)
+
+## 1. Competition Overview
+- **Dataset Type:** Tabular (Binary Classification) 
+- **Problem:** Predict customer churn. 
+- **Evaluation Metric:** ROC AUC Score 
+- **Competition Link:** [Playground Series - Season 6, Episode 3](https://www.kaggle.com/c/playground-series-s6e3) 
+- **Winning Writeups:**
+  - [1st place](https://www.kaggle.com/c/playground-series-s6e3/writeups/1st-place-gpt5-4-gemini3-1-claudeopus4-6-kgm)
+  - [3rd place](https://www.kaggle.com/c/playground-series-s6e3/writeups/3rd-place-solution-an-ensemble-of-100-oofs)
+  - [5th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/5th-place-solution-149-models-6-meta-models)
+  - [9th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/9th-place-solution)
+  - [16th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/16th-place-solution-ridge-ensembling)
+  - [17th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/17th-place-solution)
+  - [18th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/18th-place-many-oofs-neural-networks-over-gbdts)
+  - [21st place](https://www.kaggle.com/c/playground-series-s6e3/writeups/21st-place-solution-final-blend-selection-with-ri)
+  - [22nd place](https://www.kaggle.com/c/playground-series-s6e3/writeups/22nd-place-solution)
+  - [34th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/34th-place-solution-ridge-multi-view-ensemble)
+  - [38th place](https://www.kaggle.com/c/playground-series-s6e3/writeups/rank-38-approach)
+
+---
+
 ## **Competition name** - [Playground Series - Season 6, Episode 2](https://www.kaggle.com/c/playground-series-s6e2)
 
 ## 1. Competition Overview
@@ -18,9 +137,20 @@
 - **Competition Link:** [Playground Series - Season 6, Episode 2](https://www.kaggle.com/c/playground-series-s6e2) 
 - **Winning Writeups:**
   - [1st place](https://www.kaggle.com/competitions/playground-series-s6e2/writeups/1st-place-solution-diversity-selection-and-t)
+  - [2nd place](https://www.kaggle.com/c/playground-series-s6e2/writeups/2nd-place-solution-avoid-leaks-and-overfitting)
+  - [3rd place](https://www.kaggle.com/c/playground-series-s6e2/writeups/3rd-place-solution)
   - [4th place](https://www.kaggle.com/competitions/playground-series-s6e2/writeups/4th-place-solution)
   - [8th place](https://www.kaggle.com/competitions/playground-series-s6e2/writeups/8th-place-ensemble-and-trustcv) 
   - [10th place](https://www.kaggle.com/competitions/playground-series-s6e2/writeups/10th-rank-solution-playground-series-s6e2) 
+  - [12th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/top-12-finish-2-score-wise)
+  - [15th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/15th-place-solution)
+  - [16th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/16th-place-solution-trust-your-cv)
+  - [20th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/20th-place-solution-private-0-95533-ridge-stac)
+  - [22nd place](https://www.kaggle.com/c/playground-series-s6e2/writeups/22nd-place-nns-again-better-than-gbms)
+  - [25th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/25th-place-solution)
+  - [35th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/35-place-time-for-a-write-up)
+  - [43rd place](https://www.kaggle.com/c/playground-series-s6e2/writeups/43-solution-catboost-realmlp)
+  - [44th place](https://www.kaggle.com/c/playground-series-s6e2/writeups/44th-place-simple-as-slime)
 
 ---
 
