@@ -25,6 +25,57 @@ Here's a breakdown of the competitions included in this repository:
 
 ---
 
+### Playground Series - Season 6, Episode 8: Predicting Smartphone Addiction
+
+<table>
+  <tr>
+    <td style="width: 40%; vertical-align: top;">
+      <img src="https://www.kaggle.com/competitions/125218/images/header" alt="Predicting Smartphone Addiction Header" width="100%">
+    </td>
+    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
+      <strong>Goal:</strong> Predict the likelihood of smartphone addiction.
+      <br><br>
+      <strong>Description:</strong> The goal of this competition is to predict the likelihood of smartphone addiction using a synthetic dataset inspired by the Smartphone Addiction Prediction dataset.
+    </td>
+  </tr>
+</table>
+
+---
+
+### Playground Series - Season 6, Episode 7: Predicting Student Health Risk
+
+<table>
+  <tr>
+    <td style="width: 40%; vertical-align: top;">
+      <img src="https://www.kaggle.com/competitions/125223/images/header" alt="Predicting Student Health Risk Header" width="100%">
+    </td>
+    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
+      <strong>Goal:</strong> Predict student health risk.
+      <br><br>
+      <strong>Description:</strong> The goal of this competition is to predict student health risk (at-risk, unhealthy, fit) using a synthetic dataset inspired by the College Student Health Behavior dataset.
+    </td>
+  </tr>
+</table>
+
+---
+
+### Playground Series - Season 6, Episode 6: Predicting Stellar Class
+
+<table>
+  <tr>
+    <td style="width: 40%; vertical-align: top;">
+      <img src="https://www.kaggle.com/competitions/125222/images/header" alt="Predicting Stellar Class Header" width="100%">
+    </td>
+    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
+      <strong>Goal:</strong> Predict stellar class.
+      <br><br>
+      <strong>Description:</strong> The goal of this competition is to predict the stellar class using a synthetic dataset inspired by the Stellar classification dataset.
+    </td>
+  </tr>
+</table>
+
+---
+
 ### Playground Series - Season 6, Episode 5: Predicting F1 Pit Stops
 
 <table>
@@ -108,54 +159,4 @@ Here's a breakdown of the competitions included in this repository:
   </tr>
 </table>
 
----
-
-### Playground Series - Season 5, Episode 12: Diabetes Prediction Challenge
-
-<table>
-  <tr>
-    <td style="width: 40%; vertical-align: top;">
-      <img src="https://www.kaggle.com/competitions/91723/images/header" alt="Diabetes Prediction Challenge Header" width="100%">
-    </td>
-    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
-      <strong>Goal:</strong> Predict the probability that a patient will be diagnosed with diabetes.
-      <br><br>
-      <strong>Description:</strong> The goal of this competition is to predict the probability that a patient will be diagnosed with diabetes using a dataset generated from a deep learning model trained on the Diabetes Health Indicators Dataset.
-    </td>
-  </tr>
-</table>
-
----
-
-### Playground Series - Season 5, Episode 11: Loan Payback Prediction
-
-<table>
-  <tr>
-    <td style="width: 40%; vertical-align: top;">
-      <img src="https://www.kaggle.com/competitions/91722/images/header" alt="Loan Payback Prediction Competition Header" width="100%">
-    </td>
-    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
-      <strong>Goal:</strong> Predict whether a loan will be paid back or not.
-      <br><br>
-      <strong>Description:</strong> This project focuses on building a classification model to predict the probability of a borrower defaulting on a loan. The solution explores different models, including XGBoost and LightGBM, with hyperparameter tuning.
-    </td>
-  </tr>
-</table>
-
----
-
-### Playground Series - Season 5, Episode 10: Road Accidents
-
-<table>
-  <tr>
-    <td style="width: 40%; vertical-align: top;">
-      <img src="https://www.kaggle.com/competitions/91721/images/header" alt="Road Accidents Competition Header" width="100%">
-    </td>
-    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
-      <strong>Goal:</strong> Predict the severity of road accidents.
-      <br><br>
-      <strong>Description:</strong> This project involves analyzing a dataset of road accidents to build a model that can accurately predict the severity of an accident based on various factors like weather, road conditions, and time of day.
-    </td>
-  </tr>
-</table>
 ---
