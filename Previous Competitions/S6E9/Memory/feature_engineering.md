@@ -4,7 +4,7 @@
 >
 > 1. **Only update** after LB score confirmed
 > 2. **DO NOT EDIT** previous FE entries
-> 3. **PREPEND** new discoveries (latest first), with the format block first and feature rows written below it
+> 3. **PREPEND** new discoveries (latest first), with the format block first and feature rows written below it; entries order by version number where that does not conflict with same-day batch run order
 > 4. **Include:** Feature name, Formula, Importance %, Impact, Status
 > 5. **Status:** ✅ Used | ❌ Removed | ⚠️ No Improvement | 🔬 Research
 
@@ -14,6 +14,260 @@ The format block stays first; feature entries are written below it.
 
 | Feature | Formula | Importance % | Impact | Status |
 |---------|---------|--------------|--------|--------|
+
+---
+
+## Version 51 — Confirmed LB 0.94646 (2026-09-28) ✅ Best honest CV in project history (0.946372); the input is saved predictions, and the new content is the pool rule
+
+No features and no training: five combiners over the archive's saved vectors, all fold-sealed. The engineering content is what decides *which* legs go in.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Declared pool bands** | legs with solo OOF ≥ best *single* − 0.00010 (elite) / − 0.00050 (plateau) / − 0.00150 (wide); ensembles and lineage twins (V18/V23/V29, V38/V39) excluded from the reference and the pool | 12 / 36 / 42 legs before merging; best single V44 0.946252 | Pool width and combiner sophistication trade off, so both are declared rather than picked — the wide pool's equal-rank (0.946270) is *below* the elite pool's (0.946318) | ✅ Used |
+| **ρ > 0.999 diversity merge** | collapse legs whose OOF ranks correlate above 0.999, keep the stronger solo | elite 12 → **6 legs** (34/36/40/43/44/46); equal-rank **rose** 0.946318 → 0.946325 | **Diversity filtering by rule helps instead of hurting**: dropping near-twin legs removes duplicate votes, not signal | ✅ Used |
+| **ρ > 0.99995 lineage merge** | same rule at the V38 threshold | V45 auto-dropped as V40's bit-identical twin (12 → 11 legs) | The rule catches duplicates without anyone curating the pool | ✅ Used |
+| **Combiner comparison, fold-sealed** | weights and leg sets fitted on 9 folds, scored on the 10th; tie band 2e-05 → simplest combiner, then narrowest pool | stack 0.946352 / 0.946372 / 0.946382 / 0.946385 across pools; greedy 0.946352; equal-rank 0.946325; NNLS dead at 0.945826 | Stack spread over four pools is 3.3e-5 — **inside our own resolution**, so the tie-break rule chose the winner, not the score | ✅ Used |
+| **Winner: L2-logistic stack (C 0.3), 26 legs** | mean of fitted logits, weights from `LogisticRegression` on leg logits | sealed **0.946372**, **+0.000120 over V44 at paired DeLong z +7.34** (SE 1.6e-5); LB 0.94646 | Biggest honest CV gain we have measured. Gap +0.00009, vs V40's +0.00025 for the same score | ✅ Used |
+| **Weight-transfer defect, still present** | negative coefficients on legs that agree out-of-sample | **11 of 26 weights negative, Σ\|w\| 2.82**, V44 = 0.352, mean pairwise leg ρ 0.99405, optimism +2.5e-5 | Fold-sealing cannot see this — it is exactly the mechanism behind V38's +0.000162 CV → 0.00000 LB. The hedge is the weight-free 6-leg equal-rank at **0.946325, optimism exactly 0** | ⚠️ Note |
+| **Hill climber (forward-stepwise, 5 steps, top-12 candidates, `_div` pools only)** | leg *set* selected on the training folds, equal-weighted | plateau_div **0.946352** (+4e-6 optimism), elite_div 0.946326 | Beats equal-rank on the same pool by +9.2e-5, loses to the stack by 2.0e-5, ties the elite stack — measured, not assumed; V18's in-sample version and V25's promoted tie are the cautionary cases | 🔬 Research (measured) |
+| Cost | local CPU, nothing trained, no Kaggle session | **11.6 min** | Repricing the pool after every new model is the cheapest available CV gain and it is now the best CV we hold | ✅ Used |
+
+## Version 50 — Confirmed LB 0.94635 (2026-09-26) ❌ 5-fold geometry roster completed: XGB passes, LGBM and RealMLP fail the 0.94615 leg gate
+
+No new columns: the plan's three 5-fold roster models (V47/V48/V50) all run on V40's exact 341-column matrix (114 base + 216 triple TE of 72 keys + 11 window cols), so the entry records the ruler's outcome, not a feature table.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **V48: V44's composition at 5 folds** (V40's 341-col encodings + V31's 31-col additive `base_margin` prior, inner cv 10→5 to follow the outer geometry) | 1 XGBoost per fold, no ensemble, no refit; gate ≥ 0.94615 | OOF **0.946161 = passes the gate by +0.000011**; geometry step **−0.000091 vs V44's 10-fold 0.946252**; backbone-only OOF reproduces V31/V44's 0.938310 to four decimals (0.938311), trees add +0.007850; BestIter 3,935–5,407/8,000, nothing truncated | **The plan's highest-expectation run is its best model, and the only one that cleared its gate** — if a single model ships from the 5-fold roster it is V48. The trigram-lift mega-feature is absent from fold-1's top 15 (led instead by `TE_income_exact_int_10` 425.9): the prior is doing its job at 5 folds too | ✅ Used (roster winner) |
+| **V50: V46's ExtraTrees LightGBM at 5 folds** | same 341-col matrix, `extra_trees=True` + `split_histogram_sampling=True` (printed before fold 1) | OOF **0.946085 = −0.000112 vs V46's 10-fold 0.946197**, below the gate by 0.000065; **lands exactly on V26's 5-fold winner a3 (0.946085, to the last digit)** | The ExtraTrees null is **geometry-robust**: V26's +0.00010 was the shallow/wide config it rode in on, not the random thresholds, and V43 already had the config. LightGBM stays ~5.5e-5 under XGBoost at the 5-fold ruler too | ❌ Removed (null confirmed) |
+| **V47: V49's RealMLP 8-member at 5 folds** | PBLD + entity embeddings, 3×256 SiLU, 2 epochs, 4,967,793 params (87 categorical + 254 numeric = 341) | OOF **0.945866 = −0.000284 below the gate**; 5→10 geometry step **−0.000074 vs V49's 0.945940** — smallest in the roster | The neural family is closed at the 5-fold ruler too, 2.95e-4 behind the matrix's XGBoost. The 2-epoch net is less sensitive to train-row fraction than the boosters; the open test (3 epochs at 5 folds) has a negative prior (V17's 3-epoch run gained nothing) | ❌ Removed (gate failed) |
+| **The 5→10 geometry step, now measured on three models** | V44→V48 −0.000091 · V46→V50 −0.000112 · V49→V47 −0.000074 | All in the **−0.000074…−0.000112 band**: the 5-fold OOF of a 10-fold model reads ~0.00008–0.00011 *below*, not +0.0001 above, the 10-fold OOF | The stale "+0.0001 geometry caveat" printed in the V47/V48/V50 docstrings was the wrong sign; the measurements correct it. Neither ruler is "better" — they are different rulers, and the 5-fold models train on 80% of the labels, not 90% | 🔬 Research (verdict) |
+| **Fold 2 is the 5-fold weak block, not fold 4** | per-fold low points: V48 0.94526 · V50 0.94512 · V47 0.94493 | All three families show fold 2 as the low point at 5 folds, where all six model classes showed fold 4 at 10 | The split's weakest block is always the weakest fold, and no model class fixes it (V44's prior improved fold 4 at 10 folds: 0.94493 vs 0.94488 — the only mechanism that ever moved a weak block) | 🔬 Research |
+| **5-fold ladder, complete** | V48 XGB **0.946161** · V50 LGBM **0.946085** · V47 RealMLP **0.945866** | Ordering matches the 10-fold ladder (XGB 0.946252 · LGBM 0.946197 · CatBoost 0.945987 · RealMLP 0.945940 · TabM 0.94564 · HistGB 0.945482); the net's deficit from the top is *larger* at 5 folds | **The ceiling is representation-bound, not learner-bound, at either ruler** — measured now on both rulers | 🔬 Research (verdict) |
+| **Board behaviour** | V48 **0.94636** · V50 **0.94635** · V47 **0.94608** | Gaps +0.00021 / +0.00047 / +0.00021: the ladder order held on the board in reverse (weakest OOF, lowest LB), and V50's +0.00047 is the batch's widest — the 5-fold geometry's known cost | No new divergence-rule data: all three are inside the band the 5-fold models always draw | ⚖️ No Improvement |
+
+| **V48 ship candidate (5-fold roster winner)** | the only roster run to clear its gate, and the composition of the only two effects that ever measured positive | if one single model ships from the 5-fold roster it is V48; V45's refit mechanic, if used on the final, belongs on V44 (10-fold best single), not on V40 | see training_logs V48 | ✅ Used (decision) |
+
+---
+
+## Version 49 — Confirmed LB 0.94616 (2026-09-26) ❌ The neural family closed fairly: −0.000268 vs the matrix's XGBoost, below the 0.94615 leg gate
+
+No new columns: V40's exact 341-column matrix (114 base + 216 triple TE + 11 window) under a different learner. The entry records the learner and its gate outcome, not a feature table.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Published view-G RealMLP recipe on our matrix** | PBLD periodic-bias numeric embeddings (hidden 20, out 5, freq 5.0, PReLU), entity embeddings for the 87 categoricals with one-hot below 4 uniques, 3×256 SiLU 8-member net, EMA 0.997875, label smoothing 0.04 on a cosine schedule, AdamW lr 0.01 / wd 0.013, **2 epochs**, batch 256; NaNs in the 543 original rows zero-filled after scaling (a net has no native NaN path, unlike trees) | OOF **0.945940** vs V40's 0.946208 on the identical 341 columns = **−0.000268**; fold mean 0.946038 ± 0.000787, all ten folds best-epoch 2 (the schedule's signature, not truncation: fold-1 projection 107.5 min vs the 130-min cap) | V29's TabM 0.94564 was a mis-framed run (nested 120-column subset, our params). V49 is the fair version — the published neural recipe on our own matrix — and it lands 2.7e-4 behind the matrix's XGBoost | ❌ Removed (family closed fairly) |
+| **The leg gate the script carried** | declared in the docstring: solo OOF ≥ 0.94615 to be an ensemble leg, ≥ 0.946252 to challenge the best single | 0.945940 sits **0.000210 below the 0.94615 gate** | It joins the pool as a body at ρ ≈ 0.99x with the tree legs, not as a contribution. andrewleal70's falsification predicted this exactly: the MLP is the one genuinely uncorrelated build (ρ 0.975 vs trees) and its optimal blend weight measured 0.03 ≈ zero — low correlation only pays if the model also catches signal the trees miss, and it does not | ❌ Removed (gate failed) |
+| **Reproduction delta vs the published view-G numbers** | published CV 0.946139 (single-seed) / 0.946182 (3 seeds) on the same episode | our run: **−0.000199 / −0.000242** | Second "leader margin is not in the recipe" data point: view A's 0.946281 sat ≈0.000090 above our 2×2 (V43), and view G's now sits 2–3× that above our fair neural number. The field's *published* frontier keeps landing above our reproducible frontier; our honest numbers (V44 single 0.946252, sealed 0.946333–0.946373) match cdeotte's measured frontier (single 0.94627, ensemble 0.94639) — we are at it, not behind it | 🔬 Research (closed) |
+| **Fold 4** | 0.94469 | **Seventh model class on the same weak row block** (XGB, LGBM, CatBoost, TabM, HistGB, RealMLP, and V37's plain logistic) | Only V44's additive prior has ever improved fold 4 (0.94493 vs V30's 0.94488 on the same rows); the deficit is a *fitting* deficit on that block, not irreducible data hardness | 🔬 Research |
+| **Ladder at 10 folds, now complete** | XGB 0.946252 (V44) · LGBM 0.946197 (V46) · CatBoost 0.945987 (V32) · **RealMLP 0.945940 (V49, fair)** · TabM 0.94564 (V29) · HistGB 0.945482 (V35) | Six families, one plateau | Every learner we have ever run sits within 3.1e-4 of the top, and the top is XGBoost. **The ceiling is representation-bound, not learner-bound, and now measured fairly across all six families.** | 🔬 Research (verdict) |
+| **Cost** | 107.1 min GPU, folds 10.3–10.9 min each | ~2× the 50 min the docstring estimated | An 8-member × 5,053,473-parameter net on 341 columns at 2 epochs is a fair price for the last open family question; no further net runs are justified at this matrix | ✅ Used (tooling) |
+
+## Version 46 — Confirmed LB 0.94637 (2026-09-25) ❌ ExtraTrees splits are a null: +0.000006 over V43, and V26's +0.00010 gets reattributed
+
+No new columns. V43's exact 341-column LightGBM with `extra_trees=True` and `split_histogram_sampling=True`, so the delta is the split mechanism alone.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **ExtraTrees threshold randomisation on our best feature block** | every split threshold drawn uniformly inside its histogram bin instead of taking the bin's loss-minimising point; nothing else changed | **+0.000006 over V43** (0.946197 vs 0.946191); BestIter 1,606–3,138 of 20,000, nothing truncated | The only two-split-reproduced tuning gain we ever measured (V26: +0.00010 at z=5.22 on rs=42, +0.00008 at z=4.11 on rs=7) **does not compose with the encodings** — an eighth of the noise floor | ❌ Removed (not adopted) |
+| **What V26's gain actually was** | V26 ran extra_trees *together with* the shallow/wide direction (depth 3, 8 leaves, min_child 50, colsample 0.85, lr 0.01, 6-8k trees); V43 already had that shape | +0.00010 with both → +0.000006 with the mechanism alone | **A mechanism that clears the gate inside one configuration and vanishes inside another is a configuration effect wearing a mechanism's clothes.** This is the cleanest disproof procedure we have for a tuning claim: compose it, don't replicate it | 🔬 Research (closed) |
+| **Split-mechanism guard** | `assert` both parameters in the dict + a printed line before fold 1 | printed `extra_trees=True split_histogram_sampling=True` | LightGBM silently ignores unknown/vetoed parameters; without this, a no-op run would have been logged as a real null | ✅ Used (tooling) |
+| **Importance profile under randomised thresholds** | fold-1 gain, LightGBM units | `TE_lift_trigram_cat_200` **621,657** with 15/15 top slots TE or interaction; `_ECL_x_Subsidy` 557,018, `_ev_recipe` 195,770 | Seventh learner, same owner: the generator-artifact cross. Randomised thresholds redistribute gain *inside* the interaction family, they do not create a new one | ⚠️ No Improvement |
+
+## Version 45 — Confirmed LB 0.94643 (2026-09-25) ⚖️ The full-data refit at inference: public effect measured twice, +2e-5 and −3e-5, i.e. neutral
+
+No new features and no new columns: V40's 341-column matrix, the same 341 in the refit (guarded, printed, matched), plus one extra booster trained on 100% of the labelled rows.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Full-data refit blended at inference** | one booster on all 668,665 comp + 10,000 original rows, `num_boost_round = round(mean(best_iters)) = 5,224`, no early stopping, TE refit on that frame, windows re-cross-fitted inside it; `sub = 0.50 fold-average + 0.50 refit` | OOF **bit-identical to V40 (max diff exactly 0.0)**, LB **0.94643 vs V40's 0.94646 → −0.00003** | With V23's **+0.00002** this is two opposite-signed draws on the same mechanic: **the refit is invisible on the public slice.** Variance reduction on the private 80% is a theory argument, and this board cannot test it | ⚖️ No Improvement (measured neutral) |
+| **Refit-vs-fold-average agreement** | Spearman between the refit's test vector and the 10-fold average's | **0.999708**; mean \|rank shift\| **1,342.5** of 286,571 for the refit alone, **666.6 (0.23%)** for the shipped 50/50 blend | Quantifies what the whole operation changes: a quarter of one percent of test order. Useful calibration for the divergence rule — **0.23% of ranks ≈ 3e-5 of LB** | 🔬 Research |
+| **Column-set guard on the refit path** | assert the refit matrix carries the same 341 names as the CV matrices (the one way this version could be silently wrong: a mismatch makes it a *different* model, not a *bigger* one) | matched, 341 = 341, no warning printed | A refit is only a variance-reduction argument if it is the same model trained on more rows | ✅ Used (audit) |
+| **Determinism, third confirmation** | V45 vs V40 fold AUCs and BestIters | **all ten folds identical to the logged digit** (0.94637/5112 … 0.94614/6108) | Third independent proof this pipeline is bit-deterministic across Kaggle sessions (after V28's and V29's controls). **It is what licenses reading −0.00003 as the refit alone** rather than as run-to-run noise | ✅ Used (method) |
+| **Cost of the mechanic** | refit stage vs total | **4.2 min of 51.0 = 8%** | Cheap enough to fold into a final without spending a version on it | ✅ Used |
+
+## Version 44 — Confirmed LB 0.94638 (2026-09-25) 🏆 Best honest single-model CV we have built (0.946252); the composition of the only two effects that ever measured positive
+
+No new columns: V40's 341-column matrix byte-for-byte, plus **V31's additive backbone fed in as `base_margin`**. The engineering content is the demonstration that a prior and a representation are different axes.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Additive `base_margin` prior on V40's matrix** | LogisticRegression (C 0.5, lbfgs, max_iter 3000) on 31 additive cols — the 7 numerics + `_log_*` terms + `income_exact_int/100/1000` + `commute_integer` + one-hot of the 6 categoricals, standardised, clipped to [1e-6, 1−1e-6], logit-transformed; per-fold fit on fold-train rows, cross-fitted on an inner `KFold(5,42)` so training rows get out-of-fold margins | **+0.000044 over V40**, +0.000028 over V31, +0.000081 over V30; misses our +0.00005 gate by 6e-6 | **The two effects add to within 9e-6** (predicted 0.946261 vs measured 0.946252), which proves both are real and independent — the one thing no amount of solo-CV measurement could establish | ✅ Used |
+| **Where the trees' work went** | fold-1 gain profile vs V40's | V40: `TE_lift_trigram_cat_100` **9,642.9**, 5.2× the #2. V44: max **251.0** (`TE_income_exact_int_10`), flat, with `Range_Anxiety_Level_fe` 227.3 and `Daily_Commute_km_org_mean_cat_fe` 146.3 in the top 15 | **A working prior dissolves the mega-feature.** Given the additive law for free, the trees stop needing one giant trigram-lift column to reconstruct it and spread the work over raw frequencies — the clearest causal read on our #1 feature we have ever got | 🔬 Research |
+| **Rounds consumed by the prior** | BestIter distribution | **3,312–5,709** vs V40's 4,091–6,420; total wall time **fell** to 43.7 min from 46.2 | The prior is doing the arithmetic the first ~1,000 trees used to do. Cheaper *and* better — the signature of a real gain rather than a lucky one | ✅ Used |
+| **Fold 4** | the block that has been weakest across six model classes | **0.94493 vs V30's 0.94488 on identical rows** — first improvement on record | Suggests fold 4's deficit was a *fitting* deficit (the additive law being re-derived badly on that row block), not irreducibly hard data | 🔬 Research |
+| **Convergence and stability** | 8,000 rounds / ES 400; fold SD | No fold within 1.7× of the cap; **fold SD 0.000779**, tightest of the V41–V44 batch (0.000792 / 0.000794) | The gain is spread across folds rather than carried by one draw | ✅ Used (audit) |
+| **Local pre-run audit of the spliced block** | FE replayed with `xgb.train` stubbed; assert one shared column set across all DMatrix objects, `base_margin` present, finite, length-matched, non-constant | Kaggle printed 341 columns and margins in (−13.8, +3.4) as predicted | Third version where this check converted a would-be 45-minute failure into a clean run | ✅ Used (tooling) |
+
+## Version 43 — Confirmed LB 0.94640 (2026-09-25) ❌ The missing 2×2 corner: view-A optimiser on view-A encodings
+
+No new features. V40's exact 341-column block re-fit under megayak's own LightGBM recipe (lr 0.02, 32 leaves, depth 5, min_child 10, bagging 0.8/1, colsample 0.3, α 0.071, λ 2.0, max_bin 1024) with their triple-TE smoothings **auto/20/200 at cv=5** and `StratifiedKFold(10, shuffle, rs=42)`, so the cell is comparable to both parents.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **View-A smoothings (auto/20/200, cv=5)** | replacing our house auto/10/100 at cv=10 on the identical key set | part of a cell worth **−0.000017** vs V40 | Their smoothing choice is not a feature gain; V34 already measured their optimiser alone at −0.000015 vs V30, and here it is −0.000017 with the encodings present — the same number twice is the most convincing form a null can take | ❌ Removed (not adopted) |
+| **Encodings × learner, the full 2×2** | V30 (ours/ours) 0.946171 · V40 (theirs/ours) 0.946208 · V34 (theirs/ours, our features) 0.946156 · V43 (theirs/theirs) 0.946191 | encodings **+0.000035**, optimiser **−0.000017**, both **+0.000020** | The effects are close to additive and both tiny; nothing in the pairing rescues the other. **Every cell remains ≈0.000090 below the published 0.946281** | 🔬 Research (closed) |
+| **Usage of the new columns on LightGBM** | fold-1 gain split | `win_inc_2` **120,354**, `TE_ladder_inc10_auto` **116,497**, `win_inc_10` 57,699, `win_inc_5` 50,050 | The window/ladder family is *more* heavily used by LightGBM than by XGBoost and the score is *lower*. **Usage is not accuracy** — the cleanest statement this project has about importances | ⚠️ No Improvement |
+| **Convergence** | 20,000 rounds, ES 500 | BestIter 1,093–2,318 — no cap touched | Kills the "V34 was undertrained" defence for LightGBM on this matrix | ✅ Used (audit) |
+| **LightGBM ceiling** | fold-mean 0.946205 vs V26 0.946085, V34 0.946156, V19 0.94599 | best LightGBM fold-mean we have produced, still under XGBoost's 0.946217 | Family gap is ≈4e-5 on identical features — measured, not asserted | ⚠️ No Improvement |
+
+## Version 42 — Confirmed LB 0.94645 (2026-09-25) ❌ Continuous generator density ratio (pool vs original kNN)
+
+V40's config and block unchanged, plus `log(p_pool / p_original)` over the 7 numerics. 359 fitted columns.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **kNN density ratio, multi-scale** | `log(d_orig/d_pool)` at k ∈ {5,25,100}; pool tree fit on a seeded 150,000-row subsample of train+test, original tree on all 10,000 pool-source rows; 7 numerics standardised on the pool | 21 columns; **none in fold-1's top 15** | −0.000016 vs V40. Unlike V40's windows (which the trees used immediately), the trees ignored these entirely — the model never asked for a continuous synthesis score | ❌ Removed |
+| **`dens_bin` through the triple TE** | 20-quantile bin of the k=25 ratio, encoded as a string key at all three smoothings | 6 TE columns; not in the top 15 | Discretising the ratio did not rescue it. The information is already in `freq_*`/`lift_*`, which are exactly count-based density ratios | ❌ Removed |
+| **Label-free pool usage** | density is computed without `y`, so all 955,236 pool rows are legitimately queryable (same licence the transductive frequency encoding already uses) | FE stage **2.5 min** total, not the feared hour | The cost argument against kNN features was wrong and is now retired as a reason to skip an idea | ✅ Used (method) |
+| **Both kNN estimators, side by side** | kNN label lookup (earlier probe, −0.000004) and kNN density ratio (−0.000016) | two nulls, two different quantities | **The generator's fingerprint is already fully carried by count features.** A neighbourhood estimator of it adds no information the frequencies don't have | ❌ Failed |
+
+## Version 41 — Confirmed LB 0.94644 (2026-09-25) ❌ All 15 categorical pair cells (key + lift + novelty)
+
+V40's config and block unchanged, plus every pairwise categorical cell. 461 fitted columns (341 + 45 pair keys × 3 smoothings + 15 pair lift + 15 pair novelty + filter churn).
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Pair-cell target encoding** | for each of the C(6,2)=15 pairs of categorical originals, `A__B` as a string key through the triple TE. Only `City×Car` and `ECL×Subsidy` had been encoded before | 45 TE columns; **not one in fold-1's top 15** | −0.000018 vs V40. This was the channel V40's success most directly implied — 13 of 15 pairs untouched — and filling it bought nothing | ❌ Removed |
+| **Pair-level generator lift** | `freq_pool(A,B) / freq_orig(A,B)`, 0 when the cell is absent from the original | 15 columns; not in the top 15 | The trigram lift still owns the signal (`TE_lift_trigram_cat_100` **11,150**, `_10` 7,622). Pairwise lift is a lower-order projection of the same fingerprint | ❌ Removed |
+| **Pair-level novelty flag** | `1 if the pair cell never appears in the original 10k` | 15 columns; not in the top 15 | Novelty is already a single bit on the trigram; duplicating it at pair resolution adds representation, not information | ❌ Removed |
+| **Column-count side effects** | pair keys are string features, so the numeric-as-string block grew 95 → 125; the redundancy filter then dropped **194** columns instead of 149 | Runtime stayed at 63.2 min | The filter absorbed the 60 new columns; "more features = slower" is not automatic on this pipeline | 🔬 Research |
+| **The inference being punished** | I derived a *gap* from a *diff of feature lists* (their matrix has pair cells, ours didn't ⇒ pair cells are the missing 9e-5) | Cost 63 min to answer "no" | **Absence of a feature is not evidence of a gap.** A missing column matters only if the learner asks for it once it is there; importances never did | ❌ Failed (method) |
+
+## Version 40 — Confirmed LB 0.94646 (2026-09-25) 🏆 New best score; the last feature idea, measured at +0.000037 and closed
+
+V30's GPU XGBoost, house ruler, house TE settings — **only the encoding block is new**. 341 fitted columns = 114 base + 216 TE (72 keys × 3 smoothings) + 11 window rates.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Centred-window target rates, income** | for each row, `Σy + prior·gm / Σcount + prior` over incomes within ±w dollars, w ∈ {2,5,10,25,50,200}, bincount + prefix-sum range scan, `prior=10`, cross-fitted on inner `SKFold(5,42)` of fold-train rows | 6 columns; `win_inc_2` earns **378.5** fold-1 gain (top 15) | Whole model moves **+0.000037** (V40 vs V30, everything else identical) — a legitimate representation that is *used* and worth less than our +0.00005 noise gate. Neighbourhood smoothing of exact-income TE adds what the exact key missed: nothing measurable | ⚠️ No Improvement |
+| **Centred-window target rates, commute** | same estimator on `round(km×10)` (tenths of a km), w ∈ {1,3,10} | 3 columns; none in fold-1's top 15 | Commute is already carried by `commute_integer`, its TE and the ECL×RangeAnxiety interaction. A third resolution of the same axis is redundant | ⚠️ No Improvement |
+| **Group-restricted windows** | income windows at w ∈ {5,25} computed **inside `City_Type × Current_Car_Type`** groups (factorised over pooled train+test), gm pre-fill for empty groups | 2 columns; not in the top 15 | Distinct from our 3-way joint-cell TE null because it is a *continuous-neighbourhood* rate inside a cell, not a cell mean — and it still adds nothing | ⚠️ No Improvement |
+| **Quantisation ladder** | `inc//10, //50, //500, //5000`, `km//5, //50` as string keys through the triple TE, kept **alongside** exact/100/1000 | 18 TE columns; `TE_ladder_inc10_10` **458.4**, `TE_ladder_inc10_auto` 303.4, `TE_ladder_inc50_auto` 246.4 in fold-1's top 15 | The most-used new family, and the reason the aggregate effect isn't zero — yet 3 keys in the top 15 still buy 3.7e-5 overall. Mid-resolution ladders duplicate both the exact key above them and the //100 key below | ⚠️ No Improvement |
+| **Design choice: encodings on our model, not their clone** | the first draft cloned view A (CPU LightGBM, their smoothings/cv=5, `StratifiedKFold`); rebuilt as V30's config + house TE so exactly one variable moves | V40 − V30 **is** the encoding effect; V34 already showed their optimiser is a tie (0.946156) | Without this, +0.000037 would have been confounded with learner, smoothing and ruler changes at once. Same lesson as V38's slice error: replicate a rival by changing one thing | ✅ Used (method) |
+| **Convergence check** | `NUM_ROUND=8000`, ES 400 | BestIter 4,091–6,420 across 10 folds — no fold truncated | Unlike V33, this figure is a converged measurement, so "+0.000037" is a real floor *and* ceiling, not an undertrained artefact | ✅ Used (audit) |
+| **Local pre-run audit of the encoding block** | replay FE with `xgb.train` stubbed; assert 11 window + 18 ladder columns, 341 total, zero NaN/inf, window values ∈ [0,1] | Kaggle reproduced the counts exactly (341 = 312 + 29) | Two earlier versions died on wrong assumptions about the column set; this check costs a local minute and retires that failure class | ✅ Used (tooling) |
+| **view A's 0.946281 not reproduced** | their encodings + our best model = 0.946208 | −0.000073 vs the published claim | With V32 (their CatBoost at our params: 0.945987) and V34 (their optimiser: 0.946156), every candidate source of their edge except their own data/ruler has now been tested. Nothing left to copy from them | ❌ Removed (route closed) |
+| `TE_lift_trigram_cat_100` | unchanged generator-lift trigram TE | **9,642.9**, 5.2× the #2 feature | Fifth version and second learner where the trigram owns the model; 29 extra encoding columns did not move the hierarchy | ✅ Used |
+
+## Version 39 — Confirmed LB 0.94640 (2026-09-25) ✅ Second-best LB we hold, from a combiner with **zero** fitted degrees of freedom
+
+No features and no fitting: equal-weight rank mean over four saved prediction vectors. The engineering content of this version is the **eligibility rule** and what band width costs.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Elite leg pool by declared rule** | every version whose solo OOF ≥ best *single* model − 0.00010; ensembles excluded from the reference and the pool; lineage duplicates (V18 blend, V23 = V20's OOF, V29 = V22 control) excluded; V38 excluded because it is built from these legs | 4 legs: V30 0.946171 · V31 0.946224 · V34 0.946156 · V36 0.946199; mean pairwise rank ρ **0.99797** (min 0.99728) | "Statistically indistinguishable from our best model" is the narrowest defensible leg-pool definition, and an equal-weight averager needs exactly that — see the dilution row | ✅ Used |
+| **Equal-weight rank mean** | `mean(percentile_rank(leg))` — no weights, no selection, nothing fitted | OOF **0.946285** = +0.000114 over V30, +0.000061 over V31; **LB 0.94640** | ~70% of the ensemble effect is reachable with zero fitted freedom, so most of what V38's stack earned was averaging, not meta-learning | ✅ Used |
+| Weight-free alternatives | `logit_mean` (sigmoid of mean logit), `prob_mean` (mean probability) | 0.946286 / 0.946286 vs rank mean 0.946285 | All three inside the 0.00002 tie band, so the pre-declared order shipped rank_mean rather than the data deciding — **averaging space is worth 1e-6 and is not a lever** | ✅ Equivalent |
+| **Band sensitivity (printed, not selected on)** | same combiner at 5e-05 / **1e-04** / 2e-04 / 5e-04 | 2 legs 0.946304 · 4 **0.946285** · 11 0.946238 · 25 0.946223 | **Dilution is monotone in pool width** (~3e-6 per 1e-4 of widening): the quantitative reason equal weight needs a narrow rule while a stacker tolerates a wide pool — it can down-weight what an averager must include | 🔬 Research (measured) |
+| `rank_mean` output scale | shipped values are percentile ranks (0.000023 … 0.999998), not calibrated probabilities | AUC-identical, monotone | Valid for an AUC metric; if a probability-looking file is wanted, `prob_mean` is 1e-6 better and order-equivalent | ⚠️ Note |
+| Self-referential rule bug (caught by running it) | the band reference was the archive's best OOF — by then **V38's stack**, made of the legs being selected | elite pool came up **empty**; mean of nothing → NaN | Any eligibility rule over a growing archive must exclude prior ensembles from its own reference or it turns circular. Fixed: reference = best *single* model | ✅ Used (lesson) |
+| Cost | local CPU, no training, no Kaggle session | **0.6 min** | Two of the three best scores we now hold cost under a minute of compute — the open question is the marginal value of another trained model, not its marginal cost | ✅ Used |
+
+## Version 38 — Confirmed LB 0.94639 (2026-09-25) ✅ Best honest OOF (0.946333); a new *input class*: saved predictions, not features
+
+No feature engineering at all — this version's inputs are the archive's own prediction vectors. The relevant "feature table" is therefore the leg pool and what the combiner did with it.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| Leg pool by **declared rule**, not hand-picking | 36 paired `oof_v*`/`sub_v*` vectors; plateau = solo OOF ≥ best − 0.0005 (25 legs), wide = ≥ best − 0.0015 (31 legs); lineage duplicates excluded by rule (V23's OOF *is* V20's, V29's saved model is the V22 control, V18 is itself a blend of V1–V17); auto-merge any pair at rank ρ > 0.99995 | Band rule excluded V5/V15/V37; lineage rule excluded V23/V29; **the duplicate merge fired zero times** | The zero-merge result is independent confirmation of the archive finding: once true duplicates are gone, no two of our models are near-identical (mean pairwise ρ 0.9946), so averaging can in principle help — the ceiling is not "all models are the same" | ✅ Used |
+| **Fold-sealed combiner protocol** | Fit weights/leg-set on 9 folds of `KFold(10, shuffle, 42)`, apply to the 10th; print the in-sample score of the same arm alongside | Stack sealed **0.946333** / in-sample 0.946354 (optimism +0.000021); greedy 0.946312 / 0.946316; equal weight identical by construction | This is the protocol V18 violated (hill climber fitted directly on training rows: OOF 0.94623, LB 0.94635, no gain) and it is what makes the +0.000162-over-V30 number credible | ✅ Used |
+| **L2-logistic stack on logits** (winner) | `LogisticRegression(C=0.3, lbfgs)` over 25 leg logits, refit on all train rows for the test blend | **+0.000162 over V30, +0.000109 over V31** sealed; LB 0.94639 = V30's exact LB | Largest honest gain since the 10-fold ruler, and the board paid nothing for it. Shipped as candidate #1 for the final, with the caveat below | ✅ Used |
+| **Weighted-stack transfer defect** (new finding, invisible to CV) | A leg's OOF row comes from **one** fold model; its test row from the **average of ten** — so the meta-learner is fitted on inputs noisier than the ones it will face | Fitted weights: **12/25 negative**, sum \|w\| **2.592**, max \|w\| 0.362, V16 **−0.2789**, V12 −0.1403, V32 −0.1151, V21 −0.1016 at ρ = 0.9946 | The stack is being paid to cancel leg-specific noise that 10-fold averaging has already removed at test time. Fold-sealing cannot detect this — it is not label leakage, it is train/test geometry mismatch | 🔬 Research (unresolved) |
+| Shrinkage sweep as the test of that defect | Same arm, C = 1.0 / 0.3 / 0.1 / 0.03 / 0.01, plus non-negative-clipped renormalised variants | sealed 0.946333 / 0.946333 / 0.946334 / 0.946335 / 0.946334; clipped non-negative 0.946301 / 0.946302 | **Our CV cannot adjudicate the defect**: 100× shrinkage moves nothing and removing all negative weights costs only 3e-5. Hence the decision moves to a cheap public experiment (submit the equal-weight variant) instead of a number we can compute locally | ⚠️ Inconclusive |
+| Equal-weight averaging | Mean of percentile ranks / mean of logits over the same pools | 25 legs → 0.946223 (≈ V31 alone); 31 legs → 0.946234; the earlier 8-strong-leg set → 0.946259 | **Pool width punishes equal weight specifically** — averaging in legs 0.0003 behind is not neutral, it is a 3.6e-5 cost. Immune to the transfer defect, which makes it the conservative final candidate | ✅ Used (fallback) |
+| NNLS logit blend | Non-negative least squares of leg logits against 0/1 labels | **0.945826** on both pools — below every leg except V13/V33 | Wrong objective for a rank metric: least squares to binary labels is not AUC. Closed, do not revisit | ❌ Removed |
+| Greedy forward selection | Stepwise leg addition to 6 legs, equal weight within the chosen set, fold-sealed | 0.946312 sealed, optimism **+0.000004**, but **416 s** (plateau) and **510 s** (wide) per rerun | Best-behaved arm and still 2e-5 behind the stack — leg *selection* is not where the gain is. Kept as an audit tool, not a ship candidate | ⚠️ No Improvement |
+| Divergence of the shipped test ranking | mean \|rank shift\| across the 286,571 test rows vs our own submissions | vs V30 **0.658%**, vs V31 0.634%, vs V23 0.709%, vs V34 0.801% (Spearman 0.99930 / 0.99946 / 0.99922 / 0.99898) | A low-divergence submission that still returned only 0.94639 — so record the limit of our own predictor: divergence-vs-consensus ranking LB at **−0.770 as a group trend**, and it does **not** license per-submission inference | 🔬 Research |
+| Cost profile | Local CPU, no training, no Kaggle session | **18.6 min** for all 10 arms; the winning arm alone is 33 s | The shoot-out is now a standing tool: after every new version, rerun it and judge the version by whether the pool's sealed score rises, not by whether its solo CV beats V30 | ✅ Used |
+
+## Version 37 — Confirmed LB 0.94335 (2026-09-24) ❌ Linear ceiling pinned: one-hot + WoE loses to target encoding
+
+**A deliberately different representation**: no V19 FE pipeline at all. The design is 2,076 sparse CSR columns built per fold, with every label-dependent statistic fitted on that fold's training rows only (composition pool + its own original rows), and `assert X.shape[1] == DESIGN_WIDTH` guarding column alignment across folds.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| Static one-hot lattice (1,120 cols) | 6 originals + `ECL_str` (22 levels) • 4 cell keys `key_ecl_sub`/`key_ecl_ra`/`key_ecl_sub_ra` (55) • exact integer lattices `commute_tenth` 994, `age_int` 45, `cars_int` 4 (1,043). Vocabularies built on **labelled pool rows only**; `reindex` maps unseen test values to an all-zero row | Design fits in memory as CSR; fold-1 top coefficients are `oh_Range_Anxiety_Level=High` **−1.7728**, `=Low` **+1.1165** | The lattice reproduces the generator's *deterministic* cells exactly where they matter (Range=High is a hard −1.77 logit), and still scores 0.0030 below the GBM — the artefact value is in the *conditional*, not the cell identity | ✅ Used (diagnostic) |
+| Quantile-binned high-cardinality numerics (948 cols) | 900 income bins + 48 charging bins, quantile edges from labelled pool rows, per-fold | Never individually important; `oh_incomebin_0565` is the first bin-level term to appear in the top 15 (−0.469) | Binning income at 900 levels instead of using its exact value is the *deliberate* weakness of this view — it is the control that isolates what TE contributes | ⚠️ No Improvement |
+| 8 smoothed **WoE** terms (target-dependent, fold-safe) | `woe = ln(P(1\|cell)/P(0\|cell))` with smoothing, for income / commute / age / concern / subsidy / charging / car-type / city-type, mapped into the design as continuous columns | `woe_income` **+1.1143**, `woe_subsidy` **+1.0254**, `woe_commute` **+0.9795**, `woe_ecl` **+0.9385** — four of the six largest coefficients | This is the closest we have read the generator's additive law directly, and it matches the reconstructed coefficients (income/commute/concern/subsidy positive, Range=High strongly negative). It also explains V31's gain: an additive prior *is* present in the data, it just cannot be extended by trees alone | 🔬 Research (measured) |
+| One-hot/WoE vs **target encoding** for a linear model | Same folds, same rows, `LogisticRegression` on 2,076 one-hot+WoE columns (V37) vs V5's TE-bearing linear run | OOF **0.943220** vs V5 **0.944677** = **−0.001457**; vs V30's GBM 0.946171 = −0.002951 | **Target encoding is the better linear representation**, because it hands the model the estimated conditional for an exact high-cardinality cell, which a fixed lattice cannot express at stable variance. The 0.002951 linear-vs-GBM gap is the price of the interaction/artefact structure only trees exploit | ❌ Removed (route closed) |
+| `C` grid {0.3, 1.0, 3.0, 10.0} per fold, one design build shared | lbfgs, l2, `max_iter=1000`, n_iter 44–71 | OOF by C: **0.943220 / 0.943193 / 0.943165 / 0.943168** — the tightest penalty wins and loosening hurts monotonically | My prior (that a 2,076-column design was over-penalised) is **wrong**: the design is over-*parameterised* for this label, so more freedom only adds variance. Recorded as a hypothesis corrected by measurement | ❌ Removed |
+| Cost profile | 4 C values × 10 folds on CPU | **5.0 min total**, 0.4–0.5 min per fold — cheapest run in the series by ~4× | A linear leg is nearly free to keep in the toolkit for sanity checks; it just cannot compete here | ✅ Used (tooling) |
+
+---
+
+## Version 36 — Confirmed LB 0.94637 (2026-09-24) ✅ Fold geometry measured twice; lever spent
+
+FE region **byte-identical to V30** (180 base + 198 Triple TE = 312 columns). Two constants change: `N_FOLDS = 20` (which also drives `TargetEncoder(cv=20)` and the per-fold original-row concat, 9,500 of 10,000 orig rows in-train) and the split seed, `KFold(20, shuffle, random_state=7)`.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| Fold count 10 → 20 (validation geometry, not features) | Each model trains on 95% of labels (635,231 comp + 9,500 orig) and validates on 33,433 rows | OOF **0.946199** vs V30's 0.946171 = **+0.000028** at 2.1× the wall time (95.3 vs 45.3 min) | The geometry curve is now measured at both steps and it is **concave**: 5→10 = +0.000097, 10→20 = +0.000028. The lever is spent; no further fold count is worth buying | ✅ Used (verdict) |
+| Second CV schema | Different seed as well as different K | Fold SD **0.001352** (V30: 0.000783), per-fold AUC 0.94346–0.94901, BestIter 2,927–7,943 — the widest spread in the archive | Half the validation rows per fold makes the mean a noisier estimate, and because the seed changed too, **+0.000028 cannot be separated from split luck**. That ambiguity is exactly why V22 used two-split confirmation; not worth 2× again for a number this small | ⚠️ Confounded |
+| TE block re-fitted at `cv=20` | 66 keys × (auto/10/100) = 198 columns, now averaged over 19 out-of-fold segments | Fold-1 leaders: `TE_lift_trigram_cat_auto` 6,210, `TE_lift_trigram_cat_10` 5,127, then raw **`Environmental_Concern_Level` 2,620** and `_ev_recipe` 1,292; `TE_bigram_ECL_bin_x_RangeAnxiety_100` 1,205 rises into the top 5 | The trigram lift still leads, but a 20-fold TE is smoother and the raw generator columns gain relative share — consistent with V29/V32's finding that the ranking of features is stable while their weights move with the fitting geometry | ✅ Used (diagnostic) |
+
+---
+
+## Version 35 — Confirmed LB 0.94572 (2026-09-24) ❌ HistGradientBoosting family closed
+
+FE region **byte-identical to V30**, plus one representation change native to this learner: the declared categoricals are kept as columns alongside their TE copies, so the fitted matrix is **320 columns** (180 base + 198 TE, 8 declared categorical).
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| `HistGradientBoostingClassifier` (a family never run here) | `lr .02, max_iter 6000, max_leaf_nodes 31, min_samples_leaf 40, l2_regularization 1.0, max_bins 255, early_stopping=True`, `categorical_features` passed as **integer column indices** | OOF **0.945482** vs V30 0.946171 = **−0.000689**; per-fold 0.94417–0.94732; `n_iter_` 547–984 | Fourth distinct learner on this exact matrix (XGB, LGBM, CatBoost, TabM, now HGB) and none of them beats XGBoost. **The ceiling is representation-bound, not learner-bound** — that sentence was a hypothesis before this batch and is a measurement now | ❌ Removed (family closed) |
+| Native categorical handling with cardinality guard | Declare a column categorical only if its distinct count ≤ `max_bins`; sklearn hard-errors otherwise | **8 of 10** declared: the 6 originals + `income1000_floor` + `commute_integer`; 2 rejected for cardinality | The guard converts a guaranteed crash into a logged skip — this was defect #4 found while auditing V19–V30 configs | ✅ Used |
+| sklearn's private early-stopping split | `early_stopping=True` holds out a random ~10% **inside** each training fold | Each fit saw ≈ 81% of V30's training rows | **V35's number is pessimistic by construction** — but not enough to matter: V32 ran with no such handicap and still sat at −0.000184, so closing −0.000689 on this correction alone is not credible. No rerun | ⚠️ Confounded |
+| Time/value ratio | CPU, 10 folds, 9.7–12.6 min each | **116.7 min** for the batch's second-worst score | Screening lesson kept: a new family must be cheap or the score must be competitive; this was neither | ❌ Removed |
+
+---
+
+## Version 34 — Confirmed LB 0.94638 (2026-09-24) ✅ LightGBM reaches XGBoost parity — the defect was real
+
+FE region **byte-identical to V30** (312 columns). The change is the learner and its config — specifically the first LightGBM run in this repo in which bagging actually executes.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| `subsample_freq=1` paired with `subsample=0.8` | LightGBM only samples rows when **both** are set; V3/V10/V19/V26 set `subsample` alone, so their bagging silently never ran | Published config (`lr .02, num_leaves 32, max_depth 5, min_data_in_leaf 10, bagging .8/1, feature_fraction .3, λ1 .071, λ2 2.03, max_bin 1024, 20k rounds/ES 500`) → OOF **0.946156** vs V30's 0.946171 = **−0.000015** | The latent defect was worth measuring, not just noting: with it fixed, LightGBM **ties** XGBoost on the identical matrix and folds for the first time. Four archived verdicts described a different model than intended | ✅ Used (record corrected) |
+| Early stopping vs round cap | `num_boost_round=20000`, `early_stopping_rounds=500` | BestIter **892–1,985**, i.e. no fold anywhere near the cap | Contrast with V33, where 9/10 folds hit the 8,000-round cap: V34's parity figure is a converged measurement, not a truncated one | ✅ Used |
+| Importances (fold 1, gain) | Same 312 columns | `TE_lift_trigram_cat_auto` 1,746,919 • `_cat_10` 946,812 • `_cat_100` 712,696 • `_ECL_x_Subsidy` 436,035 • `TE_bigram_ECL_bin_x_Subsidy_auto` 310,273 | The lift **trigram occupies three of the top five slots on a fourth learner configuration**; the artefact signal is not an XGBoost idiosyncrasy and no reweighting of this matrix will beat it | ✅ Used (diagnostic) |
+| Cost of parity | CPU, 5.4–8.0 min per fold | 68.1 min vs V30's 45.3 min GPU for the same score, at ~1.3k trees vs XGBoost's 4.5–6.5k | Two families now sit on the same plateau, which means the archive's 0.9944–0.9999 pairwise rank correlation is a property of the **matrix**, not of the learner — and confirms the ensemble ceiling is where we measured it | ⚠️ No Improvement |
+
+---
+
+## Version 33 — Confirmed LB 0.94481 (2026-09-24) ❌ Zero-TE view: the single largest regression of the batch
+
+The representation is the experiment: `USE_TRIPLE_TE = False` removes all **198** target-encoded columns (the 66 source keys stay in the matrix as global integer codes instead of being dropped), and `max_bin 1024 → 8192` is the only parameter change, to compensate for the lost resolution.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| **Target encoding removed entirely** (198 columns) | 180 fitted columns instead of 312; all other FE (digit block, artifact flags, lift/novelty, multi-scale keys, num-as-string, freq, targeted bigrams, groupby deviations) byte-identical to V30 | OOF **0.944967** vs V30 0.946171 = **−0.001204** — the batch's biggest single-factor loss | **The TE block *is* the score.** Every other representation axis (learner family, bin resolution, fold geometry, additive prior) moved OOF by ≤ 0.00019; removing the encoded conditionals costs six times more than any of them. This is the direct answer to V32's puzzle (a published CatBoost at CV 0.94621): the difference was never the learner | ✅ Used (verdict) |
+| Numerics-as-string kept as **global factorize codes** (66 columns label-coded) | `LabelEncoder`-style integer codes over train+orig+test pool, so XGBoost histograms them instead of one-hotting | Fold-1 gains: `_ECL_x_Subsidy_cat` **20,273.9**, `_ECL_x_Subsidy` 15,255.8, then `_ev_recipe` 1,986.6 — the top pair is **60×** the third | Without TE the model rediscovers the *same* interaction from raw codes, but at far lower resolution and with no conditional information: same story, 0.0012 worse. Consistent with V21's `_ECL_x_Subsidy` seizure (59% of gain) when the feature space is narrowed | ⚠️ No Improvement |
+| `max_bin 1024 → 8192` (the only parameter change) | Compensates exact-income resolution in the absence of `income_exact_int` TEs | Per-fold time **8.8–9.5 min** vs V30's 4.0–4.7 (2×), and the run still finished at **94.7 min** | V28's null (resolution axis closed) reproduces on the no-TE view: doubling bins doubles the time and buys nothing visible | ❌ Removed |
+| Round-cap truncation | `NUM_ROUND = 8000`, ES 400 | BestIter **[7997, 8000, 8000, 7997, 8000, 8000, 7999, 8000, 7998, 7982]** — 9 of 10 folds stopped at the cap | **V33's 0.944967 is a floor, not a point estimate.** The honest claim is "no-TE ≤ 0.9450" plus a direction; the exact size of the TE effect is confounded with undertraining. Not rerun at 20k — the sign is already decisive and would not change any decision | ⚠️ Truncated |
+| Test-prediction spread | min/max of the submitted probabilities | 0.000006 / 0.999645 vs V30's similar saturation | The no-TE model still separates the deterministic cells hard; the loss is in the graded middle, not at the extremes | 🔬 Research |
+
+---
+
+## Version 32 — Confirmed LB 0.94609 (2026-09-24) ❌ No improvement; CatBoost closed on valid parameters
+
+FE region **byte-identical to V30/V22's** (180 base + 198 Triple TE = 312 fitted columns). The only change is the learner: V24 had passed `max_bin`, which **CatBoost does not have** (`border_count`), so this re-runs the family with a real bin parameter plus the published recipe.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| `border_count=1024` (the fix for V24's dead `max_bin`) + published recipe `iterations=100000, lr=.015, depth=6, l2_leaf_reg=3.0, od_wait=800` | Same matrix, same folds, CatBoost instead of XGBoost | 10-fold OOF **0.945987** vs V30 0.946171 = **−0.000184**; vs V24's 5-fold 0.945933 the gain is only ~+0.00005 where XGBoost got +0.000097 from the same fold change | The V24 verdict was a mis-run, but **re-running it correctly confirms it**: CatBoost is genuinely behind here and converts extra labels into less improvement. So the published CV 0.94621 CatBoost is a different *input representation*, not better tuning — which is V33's hypothesis | ❌ Removed (family closed) |
+| `rsm=0.4` (the published column-sampling leg) | Fold-1 probe fits 20 iterations before the real run | probe printed `PRIMARY rejected (TypeError) -> using FALLBACK` | catboost 1.2.10 on GPU will not take `rsm` with any usable bootstrap, so the published config is only partially executable; the probe converts a guaranteed fold-1 crash into a logged substitution | ⚠️ Not executable here |
+| CatBoost feature importances (fold 1) | gain-based, same 312 columns | `TE_lift_trigram_cat_10` 7.77, `TE_lift_trigram_cat_auto` 7.28, `TE__Income_x_Subsidy_cat_10` 7.03 | Third learner in a row (V20 XGB 14.49%, V24 CB #1/#2, V32 CB #1/#2) whose top signal is the generator-lift **trigram** — the artefact is the signal, family-independently | ✅ Used (diagnostic) |
+
+---
+
+## Version 31 — Confirmed LB 0.94630 (2026-09-24) ✅ Best honest OOF (0.946224); zero feature changes
+
+**FE region byte-identical to V30/V28/V22's** (180 base + 198 Triple TE = 312 fitted columns, config unchanged). V31 adds no feature to the tree matrix — it adds a *second, additive view of the same columns* used only as a boosting prior.
+
+| Item | Definition | Result | Impact | Status |
+|------|------------|--------|--------|--------|
+| Additive backbone as `base_margin` | `LogisticRegression(C=?, l2, lbfgs, class_weight=None)` on 31 columns: 7 numerics + `_log_Income`/`_log_Commute`/`_log_Charging_Total` + 4 smooth keys (`income_exact_int`, `income100_floor`, `income1000_floor`, `commute_integer`) + one-hot of the 6 originals. **No `TE_`, `lift_`, `*_digit*`, `_fe` columns.** Training rows get out-of-fold logits from an inner `KFold(5, rs=42)`; val/test get the outer-train-fit logits. XGBoost gets those as `base_margin`. | OOF **0.946224** vs V30 0.946171 = **+0.000053** (identical folds/split/config); backbone alone **0.938310**; trees 3,298–5,177 vs V30's 4,461–6,554; LB −0.00009 | The prior works, but its size depends on the backbone *reaching the additive ceiling* — a weak backbone displaces tree capacity instead of informing it (offline proxy: −0.0020). Corroborates the depth ladder: additive-only on the pool = 0.9385, so the backbone is exactly at the additive limit | ✅ Used |
+| Additive-structure probe (offline, this session) | Depth ladder on each file: single tree and HGB by `max_depth`, original 10k vs pool | Original 10k: **depth-1 HGB best at 0.90676** (2: 0.90637, 3: 0.90362, 5: 0.89702, 8: 0.89293). Pool: 1 → 0.93847, 3 → 0.94007, 8 → 0.93968 | The generator's label law is **additive**; the pool's surplus predictability is artefact, and interactions beyond depth ~3 buy nothing — which is why 30 versions of feature work plateaued | 🔬 Research (measured) |
 
 ---
 
@@ -268,17 +522,6 @@ No new features were engineered; V18 combined saved OOF predictions only. This e
 | Simple/rank/logit averages | Equal-weight mean of probabilities, ranks, and logit-space means | N/A | OOF ≤0.94601, all below best single +0.94608 | ⚠️ No Improvement |
 | RidgeCV meta-learner | Ridge on OOF logit features, alpha chosen by 5-fold CV | N/A | OOF 0.94314; stacker broken by single-fold OOF vs averaged-test aggregation mismatch | ❌ Removed |
 
-## Version 15 — Confirmed LB 0.91256 (2026-09-10)
-
-No fold-level feature importances were reported. This entry records the encoded lookup/KNN representation and exact-match diagnostics.
-
-| Feature | Formula / Definition | Importance % | Impact | Status |
-|---------|----------------------|--------------|--------|--------|
-| Exact-match key | Encoded combination of the 24 KNN input features used for lookup | N/A | Produced 0% validation/test exact matches; no lookup signal was available | ⚠️ No Improvement |
-| KDTree numerical representation | 24 encoded train/test/original features used for Euclidean neighbor search | N/A | Enabled k=10 fallback predictions but produced weak AUC | ✅ Used |
-| KNN k=10 fallback | Mean target of the 10 nearest training neighbors | N/A | Main prediction mechanism; underperformed all established baselines | ⚠️ No Improvement |
-| Train-key uniqueness check | All 668,665 training keys were unique | N/A | Confirmed the data did not contain a deterministic duplicate-key shortcut | 🔬 Research |
-
 ## Version 17 — Confirmed LB 0.94612 (2026-09-11)
 
 No fold-level feature importances were reported. This entry records the RealMLP architecture and the V14-derived feature representation.
@@ -324,6 +567,16 @@ Importance is the reported fold-1 XGBoost feature importance. No isolated ablati
 | `_dist_to_buyer_centroid_ECL1` | Fold-safe distance to buyer centroid within ECL=1 | 0.0353 | Added small geometric subgroup signal | ✅ Used |
 | `_dist_to_buyer_centroid_ECL2` | Fold-safe distance to buyer centroid within ECL=2 | 0.0340 | Added small geometric subgroup signal | ✅ Used |
 
+## Version 15 — Confirmed LB 0.91256 (2026-09-10)
+
+No fold-level feature importances were reported. This entry records the encoded lookup/KNN representation and exact-match diagnostics.
+
+| Feature | Formula / Definition | Importance % | Impact | Status |
+|---------|----------------------|--------------|--------|--------|
+| Exact-match key | Encoded combination of the 24 KNN input features used for lookup | N/A | Produced 0% validation/test exact matches; no lookup signal was available | ⚠️ No Improvement |
+| KDTree numerical representation | 24 encoded train/test/original features used for Euclidean neighbor search | N/A | Enabled k=10 fallback predictions but produced weak AUC | ✅ Used |
+| KNN k=10 fallback | Mean target of the 10 nearest training neighbors | N/A | Main prediction mechanism; underperformed all established baselines | ⚠️ No Improvement |
+| Train-key uniqueness check | All 668,665 training keys were unique | N/A | Confirmed the data did not contain a deterministic duplicate-key shortcut | 🔬 Research |
 ## Version 14 — Confirmed LB 0.94630 (2026-09-10)
 
 Importance is the reported fold-1 XGBoost feature importance. No isolated ablation was run, so impact records observed model contribution in the submitted V14 model.
