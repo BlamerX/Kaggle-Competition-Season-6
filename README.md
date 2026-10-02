@@ -8,6 +8,23 @@ Here's a breakdown of the competitions included in this repository:
 
 ---
 
+### Playground Series - Season 6, Episode 10: Predicting Airline Satisfaction
+
+<table>
+  <tr>
+    <td style="width: 40%; vertical-align: top;">
+      <img src="https://www.kaggle.com/competitions/125224/images/header" alt="Predicting Airline Satisfaction Header" width="100%">
+    </td>
+    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
+      <strong>Goal:</strong> Predict airline passenger satisfaction.
+      <br><br>
+      <strong>Description:</strong> The goal of this competition is to predict the probability of passenger satisfaction using a synthetic dataset inspired by the Airline satisfaction dataset.
+    </td>
+  </tr>
+</table>
+
+---
+
 ### Playground Series - Season 6, Episode 9: Predicting Electric Vehicle Interest
 
 <table>
