@@ -8,6 +8,23 @@ Here's a breakdown of the competitions included in this repository:
 
 ---
 
+### Playground Series - Season 6, Episode 11: Predicting Credit Card Fraud
+
+<table>
+  <tr>
+    <td style="width: 40%; vertical-align: top;">
+      <img src="https://www.kaggle.com/competitions/125225/images/header" alt="Predicting Credit Card Fraud Header" width="100%">
+    </td>
+    <td style="width: 60%; vertical-align: top; padding-left: 20px;">
+      <strong>Goal:</strong> Predict the probability that a credit card transaction is fraudulent.
+      <br><br>
+      <strong>Description:</strong> The goal of this competition is to predict credit card fraud using a synthetic dataset inspired by the Credit Card Fraud Detection 2026 dataset.
+    </td>
+  </tr>
+</table>
+
+---
+
 ### Playground Series - Season 6, Episode 9: Predicting Electric Vehicle Interest
 
 <table>
